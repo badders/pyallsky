@@ -1,6 +1,5 @@
 import sys
 import serial
-import argparse
 import time
 import struct
 import numpy as np
@@ -236,6 +235,8 @@ class AllSkyCamera():
         return hdu
 
 if __name__ == '__main__':
+    import argparse
+
     parser = argparse.ArgumentParser(description='Fetch images from SBIG AllSky Camera')
     parser.add_argument('device', metavar='D', nargs=1, help='Serial device')
     args = parser.parse_args()
