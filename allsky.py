@@ -92,6 +92,9 @@ class AllSkyCamera():
         self._ser = ser
 
     def set_baudrate(self, baud):
+        """
+        Set the camera baud rate. Does not work yet.
+        """
         try:
             com = BAUD_RATE[baud]
         except KeyError:
@@ -104,14 +107,8 @@ class AllSkyCamera():
         self._ser.write(com + cs)
         rs = self._ser.read(1)
         self._ser.baudrate = baud
-        if rs != cs:
-            print rs, cs
-            print 'An unknown error occured rs!= cs'
-            return
-
-        if self._ser.read(1) != 'S':
-            print 'An unknown error occured no S'
-            return
+        assert(rs == cs)
+        assert(self._ser.read(1) == 'S')
 
         com = 'Test'
         self._ser.write(com + cs)
@@ -119,12 +116,7 @@ class AllSkyCamera():
         time.sleep(0.1)
 
         print self._ser.inWaiting()
-        if self._ser.read(6) != 'TestOk':
-            print 'An unknown error occured not TestOK'
-            return
-        else:
-            print 'TestOk'
-
+        assert(self._ser.read(6) == 'TestOk')
         self._ser.write('k')
 
         time.sleep(1)
@@ -141,7 +133,7 @@ class AllSkyCamera():
     def firmware_version(self):
         """
         Request version information from the camera
-        returns - hex string of the version numbers
+        returns a hex string of the version numbers
         """
         self._send_command(GET_FVERSION)
         v = self._ser.read(2)
@@ -150,7 +142,7 @@ class AllSkyCamera():
     def calibrate_guider(self):
         """
         Request the camera to automatically calibrate the guider.
-        returns - Calibration data sent back from camera
+        returns the string of calibration data sent back from camera
         """
         self._send_command(CALIBRATE_GUIDER)
         response = ''
@@ -164,7 +156,7 @@ class AllSkyCamera():
     def autonomous_guide(self):
         """
         Begin autonomous guiding process
-        returns - Data sent back from camera
+        returns -- Data sent back from camera
         """
         self._send_command(AUTO_GUIDE)
         response = ''
@@ -177,6 +169,13 @@ class AllSkyCamera():
 
 
     def _get_image_block(self, expected=4096, ignore_cs=False):
+        """
+        Get one 'block' of image data. At full frame the camera returns image
+        data in chunks of 4096 pixels. For different imaging modes this value
+        will change, but the caller can simply change the value of expected.
+        expected -- Number of pixels to retrieve
+        ignore_cs -- always pass checksum without checking (for debug only)
+        """
         valid = False
         cs_failed = 0
         while not valid:
@@ -204,7 +203,7 @@ class AllSkyCamera():
     def get_image(self, exposure=40):
         """
         Fetch an image from the camera
-        exposure - exposure time in 100us units
+        exposure -- exposure time in 100us units
         returns an astropy PrimaryHDU object
         """
         exp = struct.pack('I', exposure)[:3]
