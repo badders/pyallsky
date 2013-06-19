@@ -1,6 +1,7 @@
 import sys
 import serial
 import time
+from datetime import datetime
 import struct
 import numpy as np
 from astropy.io import fits
@@ -33,6 +34,7 @@ STOP_XFER = 'S'
 EXPOSURE_IN_PROGRESS = 'E'
 READOUT_IN_PROGRESS = 'R'
 EXPOSURE_DONE = 'D'
+MAX_EXPOSURE = 0x63FFFF
 
 # Guiding Commands
 CALIBRATE_GUIDER = 'H'
@@ -199,17 +201,24 @@ class AllSkyCamera():
         print 'Processed', len(data), 'bytes'
         return data
 
-    def get_image(self, exposure=40):
+    def get_image(self, exposure=1.0):
         """
         Fetch an image from the camera
-        exposure -- exposure time in 100us units
-        returns an astropy PrimaryHDU object
+        exposure -- exposure time in seconds
+        returns an astropy HDUList object
         """
-        exp = struct.pack('I', exposure)[:3]
+        # Camera expsosure time works in 100us units
+        exptime = exposure / 100e-6
+        if exptime > MAX_EXPOSURE:
+            exptime = MAX_EXPOSURE
+            exposure = 653.3599
+        exp = struct.pack('I', exptime)[:3]
         com = TAKE_IMAGE + exp[::-1] + chr(0x00) + chr(0x01)
 
-        self._send_command(com)
+        timestamp = datetime.now().isoformat()
 
+        print 'Beginning Exposure'
+        self._send_command(com)
         # Wait for exposure to finish
         while True:
             d = self._ser.read(1)
@@ -225,12 +234,18 @@ class AllSkyCamera():
         for _ in range(blocks_expected):
             data += self._get_image_block()
 
+        print 'Image download complete'
+
+        # Add information to fits head
+        head = fits.Header()
+        head['DATAMODE'] = '1X1 BIN'
+        head['EXPOSURE'] = '{}'.format(exposure)
+        head['DATE-OBS'] = timestamp
+
         # Now make into a fits image
         data = np.fromstring(data, dtype=np.int16)
-        print data.shape
         data = data.reshape((480, 640))
-        print data.shape
-        hdu = fits.PrimaryHDU(data)
+        hdu = fits.PrimaryHDU(data, header=head)
 
         return hdu
 
@@ -244,6 +259,7 @@ if __name__ == '__main__':
 
     camera = AllSkyCamera(dev)
     print camera.firmware_version()
-    # print camera.calibrate_guider()
-    # print camera.autonomous_guide()
-    camera.get_image().writeto('/Users/tom/test.fits', clobber=True)
+    #print camera.calibrate_guider()
+    #print camera.autonomous_guide()
+    camera.get_image(exposure=5).writeto('/Users/tom/test.fits', clobber=True)
+    #camera.get_image(exposure=1000).writeto('/Users/tom/test2.fits', clobber=True)
