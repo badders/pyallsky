@@ -4,8 +4,6 @@ matplotlib.use('Qt4Agg')
 
 from matplotlib.backends.backend_qt4agg import FigureCanvasQTAgg
 from matplotlib.figure import Figure
-
-import matplotlib.pyplot as plt
 import aplpy
 
 import sys
@@ -32,15 +30,27 @@ class QtMatplotlibGraph(FigureCanvasQTAgg):
         self._layoutChange()
 
 class FitsView(QtMatplotlibGraph):
-    def setImage(self, filename):
-        gc = aplpy.FITSFigure(filename, figure=self._fig)
-        gc.show_grayscale()
+    def __init__(self):
+        QtMatplotlibGraph.__init__(self)
+        self.__taking = False
 
-    def takeImage(self):
+    def setImage(self, filename):
+        self.gc = aplpy.FITSFigure(filename, figure=self._fig)
+        self.updateDisplay()
+
+    def takeImage(self, exposure, progress):
+        if self.__taking:
+            return
+        self._taking = True
         cam = AllSkyCamera('/dev/tty.usbserial')
         storage = '/home/allsky/images'
-        image = cam.get_image(exposure=0.1)
+        image = cam.get_image(exposure=exposure, progress_callback=progress)
+        self.gc = aplpy.FITSFigure(image, figure=self._fig)
+        self.updateDisplay()
+        self._taking = False
 
+    def updateDisplay(self):
+        self.gc.show_grayscale()
 
 class MainWindow(QtGui.QMainWindow):
     def __init__(self):
@@ -49,7 +59,21 @@ class MainWindow(QtGui.QMainWindow):
         self.fits = FitsView()
         self.ui.fitsLayout.addWidget(self.fits)
         self.ui.show()
-        self.fits.setImage('/Users/tom/test.fits')
+        self.ui.takeImage.clicked.connect(self.takeImage)
+
+    def takeImage(self):
+        self.progress = QtGui.QProgressDialog('Downloading Image from Camera ...', '', 0, 0)
+        self.progress.setCancelButton(None)
+        self.progress.setValue(0)
+        self.progress.setMinimum(0)
+        self.progress.setMaximum(100.0)
+        self.progress.show()
+        self.fits.takeImage(self.ui.exposureTime.value(), self._takeImageProgress)
+        self.progress.hide()
+
+    def _takeImageProgress(self, percent):
+        self.progress.setValue(percent)
+        QtGui.QApplication.processEvents()
 
 def main():
     app = QtGui.QApplication(sys.argv)

@@ -201,10 +201,11 @@ class AllSkyCamera():
         print 'Processed', len(data), 'bytes'
         return data
 
-    def get_image(self, exposure=1.0):
+    def get_image(self, exposure=1.0, progress_callback=None):
         """
         Fetch an image from the camera
         exposure -- exposure time in seconds
+        progress_callback -- Function to be called after each block downloaded
         returns an astropy HDUList object
         """
         # Camera expsosure time works in 100us units
@@ -231,8 +232,12 @@ class AllSkyCamera():
         self._send_command(XFER_IMAGE)
 
         data = ''
+        blocks_complete = 0
         for _ in range(blocks_expected):
             data += self._get_image_block()
+            blocks_complete += 1
+            if progress_callback is not None:
+                progress_callback(float(blocks_complete) / blocks_expected * 100)
 
         print 'Image download complete'
 
