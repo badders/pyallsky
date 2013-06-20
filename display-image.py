@@ -28,7 +28,8 @@ class FitsView(FigureCanvasQTAgg):
         self.scales['Logarithmic'] = 'log'
         self.scales['Arc Sinh'] = 'arcsinh'
         self.gc = None
-        self.cuts = 99.75
+        self.upperCut = 99.75
+        self.lowerCut = 0.25
         self.cmap = 'gray'
 
     def setImage(self, filename):
@@ -49,7 +50,7 @@ class FitsView(FigureCanvasQTAgg):
 
     def updateDisplay(self):
         if self.gc is not None:
-            self.gc.show_colorscale(pmin=100-self.cuts, pmax=self.cuts,
+            self.gc.show_colorscale(pmin=self.lowerCut, pmax=self.upperCut,
                                     stretch=self._scale, aspect='auto',
                                     cmap=self.cmap)
             self.gc.axis_labels.hide()
@@ -59,8 +60,12 @@ class FitsView(FigureCanvasQTAgg):
         self.cmap = cmap
         self.updateDisplay()
 
-    def setCuts(self, value):
-        self.cuts = value
+    def setUpperCut(self, value):
+        self.upperCut = value
+        self.updateDisplay()
+
+    def setLowerCut(self, value):
+        self.lowerCut = value
         self.updateDisplay()
 
     def getScales(self):
@@ -85,7 +90,8 @@ class MainWindow(QtGui.QMainWindow):
         self.ui.colourMap.setCurrentIndex(matplotlib.cm.datad.keys().index('gray'))
 
         self.ui.colourMap.currentIndexChanged.connect(self.cmapChange)
-        self.ui.cutValue.valueChanged.connect(self.fits.setCuts)
+        self.ui.cutUpperValue.valueChanged.connect(self.fits.setUpperCut)
+        self.ui.cutLowerValue.valueChanged.connect(self.fits.setLowerCut)
         self.fits.setImage('/Users/tom/test.fits')
 
     def cmapChange(self, index):

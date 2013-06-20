@@ -59,7 +59,7 @@
               <double>653.359900000000039</double>
              </property>
              <property name="value">
-              <double>1.000000000000000</double>
+              <double>0.100000000000000</double>
              </property>
             </widget>
            </item>
@@ -100,12 +100,28 @@
             </widget>
            </item>
            <item>
-            <widget class="QDoubleSpinBox" name="cutValue">
+            <widget class="QDoubleSpinBox" name="cutUpperValue">
+             <property name="prefix">
+              <string>Upper </string>
+             </property>
              <property name="maximum">
               <double>100.000000000000000</double>
              </property>
              <property name="value">
               <double>99.750000000000000</double>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QDoubleSpinBox" name="cutLowerValue">
+             <property name="prefix">
+              <string>Lower </string>
+             </property>
+             <property name="maximum">
+              <double>100.000000000000000</double>
+             </property>
+             <property name="value">
+              <double>0.250000000000000</double>
              </property>
             </widget>
            </item>
@@ -118,7 +134,7 @@
               </sizepolicy>
              </property>
              <property name="text">
-              <string>Normalisation</string>
+              <string>Scale</string>
              </property>
             </widget>
            </item>
