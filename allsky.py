@@ -248,18 +248,3 @@ class AllSkyCamera():
         hdu = fits.PrimaryHDU(data, header=head)
 
         return hdu
-
-if __name__ == '__main__':
-    import argparse
-
-    parser = argparse.ArgumentParser(description='Fetch images from SBIG AllSky Camera')
-    parser.add_argument('device', metavar='D', nargs=1, help='Serial device')
-    args = parser.parse_args()
-    dev = args.device[0]
-
-    camera = AllSkyCamera(dev)
-    print camera.firmware_version()
-    #print camera.calibrate_guider()
-    #print camera.autonomous_guide()
-    camera.get_image(exposure=5).writeto('/Users/tom/test.fits', clobber=True)
-    #camera.get_image(exposure=1000).writeto('/Users/tom/test2.fits', clobber=True)
