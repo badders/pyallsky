@@ -1,6 +1,7 @@
 import sys
 import serial
 import time
+import logging
 from datetime import datetime
 import struct
 import numpy as np
@@ -76,7 +77,7 @@ class AllSkyCamera():
         # Camera baud rate is initially unknown, so find it
         found = False
         for rate in sorted(BAUD_RATE, key=BAUD_RATE.get)[:-2]:
-            print 'Testing :', rate
+            logging.debug('Testing : {}'.format(rate))
             ser.baudrate = rate
             ser.write(checksum(COM_TEST))
             time.sleep(0.1)
@@ -85,11 +86,11 @@ class AllSkyCamera():
                 data = ser.read(ser.inWaiting())
                 if data == ':0':
                     found = True
-                    print 'Baud rate on camera set to', rate
+                    logging.debug('Baud rate on camera set to {}'.format(rate))
                     break
 
         if not found:
-            print 'Detection failed'
+            logging.debug('Detection failed')
         self._ser = ser
 
     def set_baudrate(self, baud):
@@ -99,11 +100,11 @@ class AllSkyCamera():
         try:
             com = BAUD_RATE[baud]
         except KeyError:
-            print 'Baud rate unsupported'
+            logging.error('Baud rate unsupported')
             return
 
         # Actually request new baud rate
-        print com
+        logging.debug(com)
         cs = checksum(com)
         self._ser.write(com + cs)
         rs = self._ser.read(1)
@@ -113,10 +114,8 @@ class AllSkyCamera():
 
         com = 'Test'
         self._ser.write(com + cs)
-        print 'Sending Test'
         time.sleep(0.1)
 
-        print self._ser.inWaiting()
         assert(self._ser.read(6) == 'TestOk')
         self._ser.write('k')
 
@@ -128,7 +127,7 @@ class AllSkyCamera():
         self._ser.write(command + cs)
         response = self._ser.read(1)
         if response != cs:
-            print 'Command error', command
+            logging.error('Command error reponse to {}'.format(command))
         return response == cs
 
     def firmware_version(self):
@@ -197,8 +196,8 @@ class AllSkyCamera():
                 valid = True
 
             if cs_failed > 0:
-                print 'Checksum failed', cs_failed, 'times'
-        print 'Processed', len(data), 'bytes'
+                logging.error('Checksum failed {} times'.format(cs_level))
+        logging.debug('Processed {} bytes'.format(len(data)))
         return data
 
     def get_image(self, exposure=1.0, progress_callback=None):
@@ -218,13 +217,13 @@ class AllSkyCamera():
 
         timestamp = datetime.now().isoformat()
 
-        print 'Beginning Exposure'
+        logging.debug('Beginning Exposure')
         self._send_command(com)
         # Wait for exposure to finish
         while True:
             d = self._ser.read(1)
             if d == EXPOSURE_DONE:
-                print 'Exposure Complete'
+                logging.debug('Exposure Complete')
                 break
 
         # Download Image
@@ -239,7 +238,7 @@ class AllSkyCamera():
             if progress_callback is not None:
                 progress_callback(float(blocks_complete) / blocks_expected * 100)
 
-        print 'Image download complete'
+        logging.debug('Image download complete')
 
         # Add information to fits head
         head = fits.Header()

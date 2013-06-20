@@ -39,7 +39,7 @@ class FitsView(QtMatplotlibGraph):
         self.scales['Linear'] =  'linear'
         self.scales['Square Root'] = 'sqrt'
         self.scales['Power'] = 'power'
-        #self.scales['Logarithmic'] = 'log'
+        self.scales['Logarithmic'] = 'log'
         self.scales['Arc Sinh'] = 'arcsinh'
         self.gc = None
         self.cuts = 99.75
@@ -89,6 +89,7 @@ class MainWindow(QtGui.QMainWindow):
         self.ui.normalisation.currentIndexChanged.connect(self.scaleChange)
         self.ui.cutValue.valueChanged.connect(self.fits.setCuts)
         self.fits.setImage('/Users/tom/test.fits')
+        self.fits._layoutChange()
 
     def scaleChange(self, index):
         self.fits.setScale(self.ui.normalisation.itemText(index))
