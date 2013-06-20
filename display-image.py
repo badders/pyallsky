@@ -51,6 +51,8 @@ class FitsView(QtMatplotlibGraph):
 
     def updateDisplay(self):
         self.gc.show_grayscale()
+        self.gc.axis_labels.hide()
+        self.gc.tick_labels.hide()
 
 class MainWindow(QtGui.QMainWindow):
     def __init__(self):
