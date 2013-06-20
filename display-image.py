@@ -7,32 +7,18 @@ from matplotlib.figure import Figure
 import aplpy
 
 import sys
-from PyQt4 import QtGui, uic
+from PyQt4 import QtGui, QtCore, uic
 
 from collections import OrderedDict
 
-class QtMatplotlibGraph(FigureCanvasQTAgg):
+class FitsView(FigureCanvasQTAgg):
     def __init__(self):
         self._fig = Figure(dpi=96)
         FigureCanvasQTAgg.__init__(self, self._fig)
         FigureCanvasQTAgg.setSizePolicy(self,
                                         QtGui.QSizePolicy.Expanding,
                                         QtGui.QSizePolicy.Expanding)
-        self._fig.set_facecolor('white')
-
-    def _layoutChange(self):
-        try:
-            self._fig.tight_layout()
-        except ValueError:
-            pass  # Discard matplotlib errors for very small graphs
-
-    def resizeEvent(self, re):
-        FigureCanvasQTAgg.resizeEvent(self, re)
-        self._layoutChange()
-
-class FitsView(QtMatplotlibGraph):
-    def __init__(self):
-        QtMatplotlibGraph.__init__(self)
+        self._fig.subplots_adjust(left=0, right=1, top=1, bottom=0)
         self.__taking = False
         self._scale = 'linear'
         self.scales = OrderedDict()
@@ -43,6 +29,7 @@ class FitsView(QtMatplotlibGraph):
         self.scales['Arc Sinh'] = 'arcsinh'
         self.gc = None
         self.cuts = 99.75
+        self.cmap = 'gray'
 
     def setImage(self, filename):
         self.gc = aplpy.FITSFigure(filename, figure=self._fig)
@@ -62,9 +49,15 @@ class FitsView(QtMatplotlibGraph):
 
     def updateDisplay(self):
         if self.gc is not None:
-            self.gc.show_grayscale(pmin=100-self.cuts, pmax=self.cuts, stretch=self._scale)
+            self.gc.show_colorscale(pmin=100-self.cuts, pmax=self.cuts,
+                                    stretch=self._scale, aspect='auto',
+                                    cmap=self.cmap)
             self.gc.axis_labels.hide()
             self.gc.tick_labels.hide()
+
+    def setCMAP(self, cmap):
+        self.cmap = cmap
+        self.updateDisplay()
 
     def setCuts(self, value):
         self.cuts = value
@@ -87,9 +80,16 @@ class MainWindow(QtGui.QMainWindow):
         self.ui.takeImage.clicked.connect(self.takeImage)
         self.ui.normalisation.addItems(self.fits.getScales().keys())
         self.ui.normalisation.currentIndexChanged.connect(self.scaleChange)
+
+        self.ui.colourMap.addItems(matplotlib.cm.datad.keys())
+        self.ui.colourMap.setCurrentIndex(matplotlib.cm.datad.keys().index('gray'))
+
+        self.ui.colourMap.currentIndexChanged.connect(self.cmapChange)
         self.ui.cutValue.valueChanged.connect(self.fits.setCuts)
         self.fits.setImage('/Users/tom/test.fits')
-        self.fits._layoutChange()
+
+    def cmapChange(self, index):
+        self.fits.setCMAP(matplotlib.cm.datad.keys()[index])
 
     def scaleChange(self, index):
         self.fits.setScale(self.ui.normalisation.itemText(index))
