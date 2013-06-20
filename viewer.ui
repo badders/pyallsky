@@ -70,6 +70,20 @@
              </property>
             </widget>
            </item>
+           <item>
+            <widget class="Line" name="line">
+             <property name="orientation">
+              <enum>Qt::Horizontal</enum>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QPushButton" name="loadButton">
+             <property name="text">
+              <string>Load File</string>
+             </property>
+            </widget>
+           </item>
           </layout>
          </widget>
         </item>

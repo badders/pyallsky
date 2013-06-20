@@ -92,13 +92,18 @@ class MainWindow(QtGui.QMainWindow):
         self.ui.colourMap.currentIndexChanged.connect(self.cmapChange)
         self.ui.cutUpperValue.valueChanged.connect(self.fits.setUpperCut)
         self.ui.cutLowerValue.valueChanged.connect(self.fits.setLowerCut)
-        self.fits.setImage('/Users/tom/test.fits')
+
+        self.ui.loadButton.clicked.connect(self.loadImage)
 
     def cmapChange(self, index):
         self.fits.setCMAP(matplotlib.cm.datad.keys()[index])
 
     def scaleChange(self, index):
         self.fits.setScale(self.ui.normalisation.itemText(index))
+
+    def loadImage(self):
+        filen = QtGui.QFileDialog.getOpenFileName(caption='Load Fits File', filter='*.fits')
+        self.fits.setImage(str(filen))
 
     def takeImage(self):
         self.progress = QtGui.QProgressDialog('Downloading Image from Camera ...', '', 0, 0)
