@@ -11,7 +11,7 @@ Requirements
 ------------
 * [OSX Usb to Serial driver](http://plugable.com/drivers/prolific/)
 * [Qt library v4](http://qt-project.org/downloads)
-* Python 2.7
+* [Python 2.7](http://python.org)
 
 Python package requirements
 -------------------
