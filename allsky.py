@@ -72,7 +72,7 @@ class AllSkyCamera():
     protocol, and providing a pythonic api to access the device
     """
     def __init__(self, device):
-        ser = serial.Serial('/dev/tty.usbserial')
+        ser = serial.Serial(device)
 
         # Camera baud rate is initially unknown, so find it
         found = False

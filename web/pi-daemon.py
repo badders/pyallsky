@@ -11,7 +11,7 @@ n.b. create a director /static/ that links to the DOWNLOAD_DIR
 
 MAX_FILES = 150
 DOWNLOAD_DIR = '/Users/tom/fits/'
-DEVICE = '/dev/tty.usberial'
+DEVICE = '/dev/tty.usbserial'
 DEFAULT_EXPOSURE = 0.1
 
 urls = ('/', 'SBIG')
