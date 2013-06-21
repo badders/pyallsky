@@ -11,6 +11,8 @@ n.b. create a director /static/ that links to the DOWNLOAD_DIR
 
 MAX_FILES = 150
 DOWNLOAD_DIR = '/Users/tom/fits/'
+DEVICE = '/dev/tty.usberial'
+DEFAULT_EXPOSURE = 0.1
 
 urls = ('/', 'SBIG')
 
@@ -19,7 +21,7 @@ render = web.template.render('templates', base='base')
 class SBIG:
     form = web.form.Form(
         web.form.Textbox('exposure', web.form.notnull,
-                         description='Exposure Time (s):', value=0.1),
+                         description='Exposure Time (s):', value=DEFAULT_EXPOSURE),
         web.form.Button('Take Image'),
     )
 
@@ -27,7 +29,7 @@ class SBIG:
         return map(os.path.basename, glob.glob(DOWNLOAD_DIR + '*.fits'))
 
     def __init__(self):
-        self.cam = allsky.AllSkyCamera('/dev/tty.usbserial')
+        self.cam = allsky.AllSkyCamera(DEVICE)
         self._camLock = False
 
     def GET(self):
