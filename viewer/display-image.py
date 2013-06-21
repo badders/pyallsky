@@ -41,7 +41,6 @@ class FitsView(FigureCanvasQTAgg):
             return
         self._taking = True
         cam = AllSkyCamera('/dev/tty.usbserial')
-        storage = '/home/allsky/images'
         image = cam.get_image(exposure=exposure, progress_callback=progress)
         self._max = image.data.max()
         self.gc = aplpy.FITSFigure(image, figure=self._fig)
