@@ -12,6 +12,10 @@ from PyQt4 import QtGui, QtCore, uic
 from collections import OrderedDict
 
 class FitsView(FigureCanvasQTAgg):
+    """
+    A FITS imageviewer base on matplotlib, rendering is done using the astropy
+    library.
+    """
     def __init__(self):
         self._fig = Figure(dpi=96)
         FigureCanvasQTAgg.__init__(self, self._fig)
@@ -32,22 +36,32 @@ class FitsView(FigureCanvasQTAgg):
         self.lowerCut = 0.25
         self.cmap = 'gray'
 
-    def setImage(self, filename):
+    def loadImage(self, filename):
+        """
+        Load a fits image from disk
+        filename -- full path to the image file
+        """
         self.gc = aplpy.FITSFigure(filename, figure=self._fig)
-        self.updateDisplay()
+        self._updateDisplay()
 
-    def takeImage(self, exposure, progress):
+    def takeImage(self, exposure, progress, dev='/dev/tty.usberial'):
+        """
+        Take an image using the All Sky camera
+        exposure -- Desired exposure time
+        progress -- Function for progress update callback
+        dev -- Path to serial device
+        """
         if self.__taking:
             return
         self._taking = True
-        cam = AllSkyCamera('/dev/tty.usbserial')
+        cam = AllSkyCamera(dev)
         image = cam.get_image(exposure=exposure, progress_callback=progress)
         self._max = image.data.max()
         self.gc = aplpy.FITSFigure(image, figure=self._fig)
-        self.updateDisplay()
+        self._updateDisplay()
         self._taking = False
 
-    def updateDisplay(self):
+    def _updateDisplay(self):
         if self.gc is not None:
             self.gc.show_colorscale(pmin=self.lowerCut, pmax=self.upperCut,
                                     stretch=self._scale, aspect='auto',
@@ -56,25 +70,47 @@ class FitsView(FigureCanvasQTAgg):
             self.gc.tick_labels.hide()
 
     def setCMAP(self, cmap):
+        """
+        Set the colourmap for the image display
+        cmap -- colourmap name (see matplotlib.cm)
+        """
         self.cmap = cmap
-        self.updateDisplay()
+        self._updateDisplay()
 
     def setUpperCut(self, value):
+        """
+        Set the upper limit for display cut
+        value -- percentage for upper limit
+        """
         self.upperCut = value
-        self.updateDisplay()
+        self._updateDisplay()
 
     def setLowerCut(self, value):
+        """
+        Set the lower limit for display cut
+        value -- percentage for the lower limit
+        """
         self.lowerCut = value
-        self.updateDisplay()
+        self._updateDisplay()
 
     def getScales(self):
+        """
+        return the available normalisation scales
+        """
         return self.scales
 
-    def setScale(self, key):
-        self._scale = self.scales[str(key)]
-        self.updateDisplay()
+    def setScale(self, scale):
+        """
+        Set normalisation scale
+        scale -- desired scale
+        """
+        self._scale = self.scales[str(scale)]
+        self._updateDisplay()
 
 class MainWindow(QtGui.QMainWindow):
+    """
+    Application User interface
+    """
     def __init__(self):
         QtGui.QMainWindow.__init__(self)
         self.ui = uic.loadUi('viewer.ui')
@@ -102,7 +138,7 @@ class MainWindow(QtGui.QMainWindow):
 
     def loadImage(self):
         filen = QtGui.QFileDialog.getOpenFileName(caption='Load Fits File', filter='*.fits')
-        self.fits.setImage(str(filen))
+        self.fits.loadImage(str(filen))
 
     def takeImage(self):
         self.progress = QtGui.QProgressDialog('Downloading Image from Camera ...', '', 0, 0)
