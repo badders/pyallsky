@@ -15,7 +15,7 @@ Requirements
 
 Python package requirements
 -------------------
-* [PyQt4](http://www.riverbankcomputing.com/software/pyqt/download)
+* [PyQt4](http://www.riverbankcomputing.com/software/pyqt/download) (Only for GUI viewer)
 * [NumPy](http://www.numpy.org/)
 * [matplotlib](http://matplotlib.org/)
 * [astropy](https://astropy.readthedocs.org/en/stable/)
