@@ -8,7 +8,6 @@ A python class for interfacing with the SBIG All Sky 340 camera. Using the [SBIG
 Requirements
 ------------
 * [OSX Usb to Serial driver](http://plugable.com/drivers/prolific/)
-* [Qt library v4](http://qt-project.org/downloads)
 * [Python 2.7](http://python.org)
 
 Python package requirements
