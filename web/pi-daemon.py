@@ -29,7 +29,6 @@ class SBIG:
         return map(os.path.basename, glob.glob(DOWNLOAD_DIR + '*.fits'))
 
     def __init__(self):
-        self.cam = allsky.AllSkyCamera(DEVICE)
         self._camLock = False
 
     def GET(self):
@@ -44,7 +43,8 @@ class SBIG:
         exposure = float(form.d.exposure)
         assert(exposure > 0 and exposure < 653.3599)
         self._camLock = True
-        image = self.cam.get_image(exposure)
+        cam = allsky.AllSkyCamera(DEVICE)
+        image = cam.get_image(exposure)
         image.writeto(DOWNLOAD_DIR + str(datetime.datetime.now()) + '.fits')
         self._camLock = False
         return render.SBIG(form, self.getImageList())
