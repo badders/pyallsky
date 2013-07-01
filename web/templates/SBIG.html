@@ -5,10 +5,12 @@ $def with (form, images)
 
 <h1>Images:</h2>
 
-<ul>
+<table>
 $for image in images
-    <li>
-        <a href="/static/$image">$image</a>
-    </li>
-</ul>
-    
+    <tr>
+    <td>$image</td>
+    <td><a href="/view/$image">View</a></td>
+    <td><a href="/static/images/$image">Download</a></td>
+    </tr>
+</table>
+

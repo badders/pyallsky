@@ -6,7 +6,7 @@ import os
 
 """
 Provide simple access to the AllSky camera throught a web interface.
-n.b. create a director /static/ that links to the DOWNLOAD_DIR
+n.b. create a director /static/images/ that links to the DOWNLOAD_DIR
 """
 
 MAX_FILES = 150
@@ -14,9 +14,15 @@ DOWNLOAD_DIR = '/Users/tom/fits/'
 DEVICE = '/dev/tty.usbserial'
 DEFAULT_EXPOSURE = 0.1
 
-urls = ('/', 'SBIG')
+urls = ('/', 'SBIG',
+        '/view/(.*)', 'Viewer')
 
 render = web.template.render('templates', base='base')
+
+class Viewer:
+    def GET(self, name):
+        img_url = '/static/images/' + name
+        return render.fitsview(img_url)
 
 class SBIG:
     form = web.form.Form(
