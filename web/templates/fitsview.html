@@ -1,0 +1,15 @@
+$def with (image)
+<h1>View Fits Image</h1>
+<script src="/static/binaryajax.js"></script>
+<script src="/static/fits.js"></script>
+<script type="text/javascript">
+    var fits = new FITS();
+    fits.strech = 'linear';
+    fits.bind('load', function(){
+        this.draw('FITSimage');
+    })
+    fits.load('$image');
+</script>
+
+<canvas id="FITSimage"></canvas>
+
