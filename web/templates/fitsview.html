@@ -11,5 +11,22 @@ $def with (image)
     fits.load('$image');
 </script>
 
+    Scaling function: <select name="scale" onChange="fits.update(this.value)">
+		<option>linear</option>
+		<option>sqrt</option>
+		<option>cuberoot</option>
+		<option selected="selected">log</option>
+		<option>sqrtlog</option>
+		<option>loglog</option>
+	</select>
+
+    Color: <select name="scale" onChange="fits.update({color:this.value})">
+		<option selected="selected">gray</option>
+		<option>heat</option>
+		<option>A</option>
+		<option>B</option>
+	</select>
+
+	<br />
 <canvas id="FITSimage"></canvas>
 
