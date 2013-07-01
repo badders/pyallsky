@@ -1,1 +1,0 @@
-../allsky.py
