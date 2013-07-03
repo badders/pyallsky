@@ -247,7 +247,7 @@ class AllSkyCamera():
         head['DATE-OBS'] = timestamp
 
         # Now make into a fits image
-        data = np.fromstring(data, dtype=np.int16)
+        data = np.fromstring(data, dtype=np.uint16)
         data = data.reshape((480, 640))
         hdu = fits.PrimaryHDU(data, header=head)
 
