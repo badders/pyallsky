@@ -10,6 +10,7 @@ Requirements
 
 Python package requirements
 -------------------
+* [pyserial](http://pyserial.sourceforge.net/)
 * [NumPy](http://www.numpy.org/)
 * [matplotlib](http://matplotlib.org/)
 * [astropy](https://astropy.readthedocs.org/en/stable/)
