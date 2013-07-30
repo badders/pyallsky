@@ -198,7 +198,7 @@ class AllSkyCamera():
                 valid = True
 
             if cs_failed > 0:
-                logging.error('Checksum failed {} times'.format(cs_level))
+                logging.error('Checksum failed')
         logging.debug('Processed {} bytes'.format(len(data)))
         return data
 
