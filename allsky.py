@@ -15,13 +15,13 @@ DE_ENERGIZE = 'K'
 
 # Setup Commands
 GET_FVERSION = 'V'
-BAUD_RATE = {9600 : 'B0',
-             19200 : 'B1',
-             38400 : 'B2',
-             57600 : 'B3',
-             115200 : 'B4',
-             230400 : 'B5',
-             460800 : 'B6'}
+BAUD_RATE = {9600: 'B0',
+             19200: 'B1',
+             38400: 'B2',
+             57600: 'B3',
+             115200: 'B4',
+             230400: 'B5',
+             460800: 'B6'}
 
 # Imaging Commands
 TAKE_IMAGE = 'T'
@@ -45,6 +45,7 @@ TERMINATOR = chr(0x1A)
 # Other Constants
 PIXEL_SIZE = 2
 
+
 def checksum(command):
     """
     Return the command with the checksum byte added
@@ -60,11 +61,13 @@ def checksum(command):
         cs = cs ^ csb
     return chr(cs)
 
+
 def hexify(s):
     """
     Print a string as hex values
     """
     return":".join(c.encode('hex') for c in s)
+
 
 class AllSkyCamera():
     """
@@ -166,7 +169,6 @@ class AllSkyCamera():
             response += a
 
         return response
-
 
     def _get_image_block(self, expected=4096, ignore_cs=False):
         """
