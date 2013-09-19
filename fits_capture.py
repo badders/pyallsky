@@ -11,6 +11,8 @@ def main():
 
     try:
         cam = AllSkyCamera(args.device)
+        cam.open_shutter()
+        cam.de_energize_shutter()
         print('Downloading image ...')
         image = cam.get_image(exposure=args.exposure)
         image.writeto(args.path)
