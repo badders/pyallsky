@@ -143,10 +143,24 @@ class AllSkyCamera():
         return hexify(v)
 
     def open_shutter(self):
+        """
+        Open the camera shutter.
+        n.b. leaves the shutter motor energized
+        """
         self._send_command(OPEN_SHUTTER)
 
     def close_shutter(self):
+        """
+        Close the camera shutter.
+        n.b. leaves the shutter motor energized
+        """
         self._send_command(CLOSE_SHUTTER)
+
+    def de_energize_shutter(self):
+        """
+        De-energize the shutter motor
+        """
+        self._send_command(DE_ENERGIZE)
 
     def calibrate_guider(self):
         """
