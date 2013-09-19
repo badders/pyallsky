@@ -142,6 +142,12 @@ class AllSkyCamera():
         v = self._ser.read(2)
         return hexify(v)
 
+    def open_shutter(self):
+        self._send_command(OPEN_SHUTTER)
+
+    def close_shutter(self):
+        self._send_command(CLOSE_SHUTTER)
+
     def calibrate_guider(self):
         """
         Request the camera to automatically calibrate the guider.
