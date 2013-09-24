@@ -1,4 +1,3 @@
-import sys
 import serial
 import time
 import logging
@@ -9,9 +8,15 @@ from astropy.io import fits
 
 # Test Commands
 COM_TEST = 'E'
+
+# Shutter Commands
 OPEN_SHUTTER = 'O'
 CLOSE_SHUTTER = 'C'
 DE_ENERGIZE = 'K'
+
+# Heater Commands
+HEATER_ON = 'g\x01'
+HEATER_OFF = 'g\x00'
 
 # Setup Commands
 GET_FVERSION = 'V'
@@ -148,6 +153,8 @@ class AllSkyCamera():
         n.b. leaves the shutter motor energized
         """
         self._send_command(OPEN_SHUTTER)
+        time.sleep(1)
+        self._send_command(DE_ENERGIZE)
 
     def close_shutter(self):
         """
@@ -155,12 +162,20 @@ class AllSkyCamera():
         n.b. leaves the shutter motor energized
         """
         self._send_command(CLOSE_SHUTTER)
-
-    def de_energize_shutter(self):
-        """
-        De-energize the shutter motor
-        """
+        time.sleep(1)
         self._send_command(DE_ENERGIZE)
+
+    def activate_heater(self):
+        """
+        Activate the built in heater
+        """
+        cmd=['g','\x01']
+
+    def deactivate_heater(self):
+        """
+        Deactivate the built in heater
+        """
+        pass
 
     def calibrate_guider(self):
         """
