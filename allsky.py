@@ -20,6 +20,7 @@ HEATER_OFF = 'g\x00'
 
 # Setup Commands
 GET_FVERSION = 'V'
+GET_SERIAL = 'r'
 BAUD_RATE = {9600: 'B0',
              19200: 'B1',
              38400: 'B2',
@@ -67,11 +68,11 @@ def checksum(command):
     return chr(cs)
 
 
-def hexify(s):
+def hexify(s, join_char=':'):
     """
     Print a string as hex values
     """
-    return":".join(c.encode('hex') for c in s)
+    return join_char.join(c.encode('hex') for c in s)
 
 
 class AllSkyCamera():
@@ -146,6 +147,14 @@ class AllSkyCamera():
         self._send_command(GET_FVERSION)
         v = self._ser.read(2)
         return hexify(v)
+
+    def serial_number(self):
+        """
+        Returns the camera's serial number
+        """
+        self._send_command(GET_SERIAL)
+        v = self._ser.read(10)
+        return hexify(v, '')
 
     def open_shutter(self):
         """
