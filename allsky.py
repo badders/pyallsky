@@ -88,7 +88,7 @@ class AllSkyCamera():
         for rate in sorted(BAUD_RATE, key=BAUD_RATE.get)[:-2]:
             logging.debug('Testing : {}'.format(rate))
             ser.baudrate = rate
-            ser.write(checksum(COM_TEST))
+            ser.write(COM_TEST + checksum(COM_TEST))
             time.sleep(0.1)
             # Expect a 2 byte response for this command
             if ser.inWaiting():
