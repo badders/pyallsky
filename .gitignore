@@ -1,0 +1,7 @@
+*.pyc
+*.fits
+*.raw
+*.jpg
+build
+dist
+pyallsky.egg-info

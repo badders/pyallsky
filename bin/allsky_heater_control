@@ -1,0 +1,48 @@
+#!/usr/bin/env python
+
+# Control the heater on an SBIG AllSky 340/340C
+
+import sys
+import logging
+import argparse
+
+from pyallsky import AllSkyCamera
+from pyallsky import setup_logging
+
+def main():
+    desc = '''Control the heater on an SBIG AllSky 340/340C Camera'''
+    parser = argparse.ArgumentParser(description=desc)
+    parser.add_argument('-d', '--device', help='Path to serial device', default='/dev/usbserial')
+    parser.add_argument('-v', '--verbose', action='count', help='Enable script debugging', default=0)
+    parser.add_argument('heater_state', help='"on" or "off"', default='off')
+    args = parser.parse_args()
+
+    # logging levels
+    if args.verbose >= 1:
+        setup_logging(logging.DEBUG)
+    else:
+        setup_logging(logging.INFO)
+
+    args.heater_state = args.heater_state.lower()
+    if args.heater_state not in ('on', 'off'):
+        logging.error('Invalid heater state given: "%s"', args.heater_state)
+        logging.error('Please use "on" or "off"')
+        sys.exit(1)
+
+    camera = AllSkyCamera(args.device)
+
+    if args.heater_state == 'on':
+        logging.info('Activate heater')
+        camera.activate_heater()
+        logging.info('Heater on')
+    else:
+        logging.info('Deactivate heater')
+        camera.deactivate_heater()
+        logging.info('Heater off')
+
+    sys.exit(0)
+
+if __name__ == '__main__':
+    main()
+
+# vim: set ts=4 sts=4 sw=4 et:
