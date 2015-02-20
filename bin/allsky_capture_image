@@ -48,7 +48,7 @@ def save_other(image, filename):
 def show_progress(pct):
     logging.info('Transfer progress: %.2f%%', pct)
 
-def capture_image(device, exposure_time):
+def capture_image(device, exposure_time, color):
     try:
         logging.info('Connecting to camera')
         cam = AllSkyCamera(device)
@@ -70,12 +70,16 @@ def capture_image(device, exposure_time):
         data = numpy.frombuffer(image.pixels, dtype=numpy.uint16)
         data = data.reshape((480, 640))
 
-        # create the monochrome image, and then scale to 8-bit
-        image.monochrome_image = cv2.cvtColor(data, cv2.COLOR_BAYER_BG2GRAY)
-        image.monochrome_image /= 256
+        # color images need de-Bayer and scaling, monochrome do not
+        if color:
+            image.monochrome_image = cv2.cvtColor(data, cv2.COLOR_BAYER_BG2GRAY)
+            image.color_image = cv2.cvtColor(data, cv2.COLOR_BAYER_BG2RGB)
+        else:
+            image.monochrome_image = numpy.copy(data)
+            image.color_image = numpy.copy(data)
 
-        # create the color image, and then scale to 8-bit
-        image.color_image = cv2.cvtColor(data, cv2.COLOR_BAYER_BG2RGB)
+        # scale images to 8-bit
+        image.monochrome_image /= 256
         image.color_image /= 256
 
         return image
@@ -90,7 +94,7 @@ def main():
     parser.add_argument('-d', '--device', help='Path to serial device', default='/dev/usbserial')
     parser.add_argument('-e', '--exposure', type=float, help='Exposure time in seconds', default=1.0)
     parser.add_argument('-v', '--verbose', action='count', help='Enable script debugging', default=0)
-    parser.add_argument('-c', '--ccd', help='Choose between MONO or COLOR CCD', default='MONO')
+    parser.add_argument('-c', '--color', action='store_true', help='Enable de-Bayer for Color CCD')
     parser.add_argument('filename', help='Filename to save image', nargs='+')
     args = parser.parse_args()
 
@@ -112,7 +116,7 @@ def main():
             sys.exit(1)
 
     # image from camera ccd, in raw, color, and monochrome formats
-    image = capture_image(args.device, args.exposure)
+    image = capture_image(args.device, args.exposure, args.color)
 
     # save to all file types requested
     for filename in args.filename:
