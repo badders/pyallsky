@@ -33,7 +33,7 @@ def save_fits(image, filename):
     header = fits.Header()
     header['DATAMODE'] = '1X1 BIN'
     header['EXPOSURE'] = '%f' % image.exposure
-    header['DATE-OBS'] = image.timestamp
+    header['DATE-OBS'] = image.timestamp.isoformat()
 
     # FITS needs some rotation
     data = image.monochrome_image.copy()
@@ -43,6 +43,28 @@ def save_fits(image, filename):
     hdu.writeto(filename)
 
 def save_other(image, filename):
+    # small white font about 10 px tall
+    font = cv2.FONT_HERSHEY_PLAIN
+    scale = 1
+    color = (255, 255, 255)
+    position = [0, 0]
+
+    # line 1: date
+    position[1] += 16
+    text = image.timestamp.strftime('%F')
+    cv2.putText(image.color_image, text, tuple(position), font, scale, color)
+
+    # line 2: time
+    position[1] += 16
+    text = image.timestamp.strftime('%T')
+    cv2.putText(image.color_image, text, tuple(position), font, scale, color)
+
+    # line 3: exposure
+    position[1] += 16
+    text = '%f s' % image.exposure
+    cv2.putText(image.color_image, text, tuple(position), font, scale, color)
+
+    # write the image
     cv2.imwrite(filename, image.color_image)
 
 def show_progress(pct):

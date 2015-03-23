@@ -446,7 +446,7 @@ class AllSkyCamera(object):
         exp = struct.pack('I', exptime)[:3]
         com = TAKE_IMAGE + exp[::-1] + chr(0x00) + chr(0x01)
 
-        timestamp = datetime.datetime.now().isoformat()
+        timestamp = datetime.datetime.utcnow()
 
         logging.debug('Exposure begin: command %s', hexify(com))
         self.send_command(com)
