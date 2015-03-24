@@ -125,6 +125,27 @@ def serial_tx(ser, data, timeout=0.5):
     '''
     ser.write(data)
 
+def serial_rx_until(ser, terminator):
+    '''
+    Receive data from a serial port until a certain terminator character is received
+
+    ser -- the serial.Serial() to receive from
+    terminator -- the single character which terminates the receive operation
+
+    Returns all of the data read up to (but not including) the terminator
+    '''
+    data = ''
+
+    while True:
+        c = ser.read(1)
+        if c == terminator:
+            break
+
+        # terminator was not found, append the current byte
+        data += c
+
+    return data
+
 def serial_expect(ser, txcmd, rxcmd, timeout=0.5):
     '''
     Send a command and receive an expected reply
@@ -353,6 +374,10 @@ class AllSkyCamera(object):
         '''Low level method to transmit some bytes to the camera'''
         return serial_tx(self.__ser, data, timeout)
 
+    def serial_rx_until(self, terminator):
+        '''Low level method to receive some bytes from the camera until a terminating byte is received'''
+        return serial_rx_until(self.__ser, terminator)
+
     def firmware_version(self):
         '''
         Request firmware version information from the camera and
@@ -415,13 +440,7 @@ class AllSkyCamera(object):
         return -- the string of calibration data sent back from camera
         '''
         self.send_command(CALIBRATE_GUIDER)
-        response = ''
-        a = ''
-        while a != TERMINATOR:
-            a = self.__ser.read(1)
-            response += a
-
-        return response
+        return self.serial_rx_until(TERMINATOR)
 
     def autonomous_guide(self):
         '''
@@ -429,13 +448,7 @@ class AllSkyCamera(object):
         return -- Data sent back from camera
         '''
         self.send_command(AUTO_GUIDE)
-        response = ''
-        a = ''
-        while a != TERMINATOR:
-            a = self.__ser.read(1)
-            response += a
-
-        return response
+        return self.serial_rx_until(TERMINATOR)
 
     def take_image(self, exposure=1.0):
         '''
@@ -456,12 +469,9 @@ class AllSkyCamera(object):
         logging.debug('Exposure begin: command %s', hexify(com))
         self.send_command(com)
 
-        while True:
-            # check to see if the exposure is finished
-            data = self.serial_rx(1)
-            if data == EXPOSURE_DONE:
-                logging.debug('Exposure complete')
-                break
+        # wait until the exposure is finished
+        self.serial_rx_until(EXPOSURE_DONE)
+        logging.debug('Exposure complete')
 
         return timestamp
 
