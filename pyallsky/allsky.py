@@ -456,11 +456,9 @@ class AllSkyCamera(object):
         exposure -- exposure time in seconds
         return -- the timestamp that the exposure was taken in ISO format
         '''
-        # Camera expsosure time works in 100us units
-        exptime = exposure / 100e-6
-        if exptime > MAX_EXPOSURE:
-            exptime = MAX_EXPOSURE
-            exposure = 653.3599
+        # Camera exposure time works in 100us units, with a maximum value
+        exptime = min(exposure / 100e-6, MAX_EXPOSURE)
+
         exp = struct.pack('I', exptime)[:3]
         com = TAKE_IMAGE + exp[::-1] + chr(0x00) + chr(0x01)
 
