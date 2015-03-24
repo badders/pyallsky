@@ -1,7 +1,9 @@
 #!/usr/bin/env python
 # vim: set ts=4 sts=4 sw=4 et:
 
-# Control for the SBIG AllSky 340/340C
+'''
+Control for the SBIG AllSky 340/340C
+'''
 
 import serial
 import time

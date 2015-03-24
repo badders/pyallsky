@@ -1,6 +1,8 @@
 #!/usr/bin/env python
 
-# Check communications between the host PC and an SBIG AllSky 340/340C
+'''
+Check communications between the host PC and an SBIG AllSky 340/340C
+'''
 
 import argparse
 import logging
