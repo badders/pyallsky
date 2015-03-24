@@ -20,25 +20,20 @@ def main():
     args = parser.parse_args()
 
     # logging levels
-    if args.verbose >= 1:
+    if args.verbose:
         setup_logging(logging.DEBUG)
     else:
         setup_logging(logging.INFO)
 
-    if len(args.shutter_state) < 1:
-        logging.error('Invalid shutter state given: "%s"', args.shutter_state)
-        logging.error('Please use "open" or "closed"')
-        sys.exit(1)
-
-    state = args.shutter_state[0].lower()
-    if state not in ('o', 'c'):
+    args.shutter_state = args.shutter_state.lower()
+    if args.shutter_state not in ('open', 'closed'):
         logging.error('Invalid shutter state given: "%s"', args.shutter_state)
         logging.error('Please use "open" or "closed"')
         sys.exit(1)
 
     camera = AllSkyCamera(args.device)
 
-    if state == 'o':
+    if args.shutter_state == 'open':
         logging.info('Opening shutter')
         camera.open_shutter()
         logging.info('Shutter open')
