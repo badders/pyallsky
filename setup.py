@@ -1,5 +1,4 @@
 #!/usr/bin/env python
-# vim: set ts=4 sts=4 sw=4 et:
 
 from setuptools import setup
 

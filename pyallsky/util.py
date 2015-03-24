@@ -20,5 +20,3 @@ def setup_logging(level=logging.INFO, stream=sys.stdout):
     # and hook it all together
     ch.setFormatter(formatter)
     logger.addHandler(ch)
-
-# vim: set ts=4 sts=4 sw=4 noet tw=80:

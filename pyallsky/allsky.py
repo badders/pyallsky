@@ -1,5 +1,4 @@
 #!/usr/bin/env python
-# vim: set ts=4 sts=4 sw=4 et:
 
 '''
 Control for the SBIG AllSky 340/340C
@@ -550,5 +549,3 @@ class AllSkyCamera(object):
 
         logging.debug('Image download complete')
         return data
-
-# vim: set ts=4 sts=4 sw=4 et:
