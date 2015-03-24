@@ -232,6 +232,10 @@ def serial_timeout_calc(ser, nbytes):
     # (bits_per_second / number_of_bits) * overhead_fudge_factor
     return (ser.getBaudrate() / (nbytes * 8)) * 1.5
 
+class AllSkyException(Exception):
+    '''Specific exception class for errors from this code'''
+    pass
+
 class AllSkyCamera(object):
     '''
     Class to interact with the SBIG AllSky 340/340C camera, encapsulating the
@@ -255,7 +259,7 @@ class AllSkyCamera(object):
         # Camera baud rate is initially unknown, so find it
         if not autobaud(ser, count=3):
             logging.debug('Autodetect baud rate failed')
-            raise Exception('Autodetect baud rate failed')
+            raise AllSkyException('Autodetect baud rate failed')
 
         self.__ser = ser
 
@@ -275,14 +279,14 @@ class AllSkyCamera(object):
             BAUD_RATE[baudrate]
         except KeyError:
             logging.error('Baud rate %d unsupported', baudrate)
-            raise Exception('Baud rate %d unsupported' % baudrate)
+            raise AllSkyException('Baud rate %d unsupported' % baudrate)
 
         ser = self.__ser
 
         # check communications first
         if not check_communications(ser):
             logging.error('Initial communications test failed')
-            raise Exception('Initial communications test failed')
+            raise AllSkyException('Initial communications test failed')
 
         # send baud rate change command
         data = BAUD_RATE[baudrate] + checksum(BAUD_RATE[baudrate])
@@ -318,7 +322,7 @@ class AllSkyCamera(object):
         # check communications again, being more liberal this time
         if not check_communications(ser, count=10, required_successes=3):
             logging.debug('Final communications test failed')
-            raise Exception('Final communications test failed')
+            raise AllSkyException('Final communications test failed')
 
     def send_command(self, command):
         '''
