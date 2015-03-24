@@ -5,112 +5,13 @@ Capture an image in RAW/JPG/FITS format from an SBIG AllSky 340/340C
 '''
 
 import os
-import cv2
 import sys
-import array
-import serial
-import argparse
 import logging
-import numpy
-from astropy.io import fits
+import argparse
+import traceback
 
-from pyallsky import AllSkyCamera
+from pyallsky import capture_image
 from pyallsky import setup_logging
-
-class AllSkyImage(object):
-    def __init__(self):
-        self.timestamp = 'UNSET'
-        self.exposure = 0.0
-        self.pixels = array.array('B')
-        self.monochrome_image = numpy.zeros(0)
-        self.color_image = numpy.zeros(0)
-
-def save_raw(image, filename):
-    with open(filename, 'wb') as f:
-        f.write(image.pixels.tostring())
-
-def save_fits(image, filename):
-
-    # add information to FITS header
-    header = fits.Header()
-    header['DATAMODE'] = '1X1 BIN'
-    header['EXPOSURE'] = '%f' % image.exposure
-    header['DATE-OBS'] = image.timestamp.isoformat()
-
-    # FITS needs some rotation
-    data = image.monochrome_image.copy()
-    data = numpy.flipud(data)
-
-    hdu = fits.PrimaryHDU(data, header=header)
-    hdu.writeto(filename)
-
-def save_other(image, filename):
-    # small white font about 10 px tall
-    font = cv2.FONT_HERSHEY_PLAIN
-    scale = 1
-    color = (255, 255, 255)
-    position = [0, 0]
-
-    # line 1: date
-    position[1] += 16
-    text = image.timestamp.strftime('%F')
-    cv2.putText(image.color_image, text, tuple(position), font, scale, color)
-
-    # line 2: time
-    position[1] += 16
-    text = image.timestamp.strftime('%T')
-    cv2.putText(image.color_image, text, tuple(position), font, scale, color)
-
-    # line 3: exposure
-    position[1] += 16
-    text = '%f s' % image.exposure
-    cv2.putText(image.color_image, text, tuple(position), font, scale, color)
-
-    # write the image
-    cv2.imwrite(filename, image.color_image)
-
-def show_progress(pct):
-    logging.info('Transfer progress: %.2f%%', pct)
-
-def capture_image(device, exposure_time, color):
-    try:
-        logging.info('Connecting to camera')
-        cam = AllSkyCamera(device)
-
-        logging.info('Opening shutter')
-        cam.open_shutter()
-
-        # create image storage
-        image = AllSkyImage()
-        image.exposure = exposure_time
-
-        logging.info('Taking exposure')
-        image.timestamp = cam.take_image(exposure=exposure_time)
-
-        logging.info('Downloading image')
-        image.pixels = cam.xfer_image(progress_callback=show_progress)
-
-        # convert to numpy array and rotate correctly
-        data = numpy.frombuffer(image.pixels, dtype=numpy.uint16)
-        data = data.reshape((480, 640))
-
-        # color images need de-Bayer and scaling, monochrome do not
-        if color:
-            image.monochrome_image = cv2.cvtColor(data, cv2.COLOR_BAYER_BG2GRAY)
-            image.color_image = cv2.cvtColor(data, cv2.COLOR_BAYER_BG2RGB)
-        else:
-            image.monochrome_image = numpy.copy(data)
-            image.color_image = numpy.copy(data)
-
-        # scale images to 8-bit
-        image.monochrome_image /= 256
-        image.color_image /= 256
-
-        return image
-
-    except serial.serialutil.SerialException as err:
-        print(str(err))
-        sys.exit(2)
 
 def main():
     desc = '''Capture an image from an SBIG Allsky 340/340C Camera'''
@@ -139,19 +40,27 @@ def main():
             logging.error('Supported extensions: %s', ', '.join(known_extensions))
             sys.exit(1)
 
-    # image from camera ccd, in raw, color, and monochrome formats
-    image = capture_image(args.device, args.exposure, args.color)
+    try:
+        # image from camera ccd, in raw, color, and monochrome formats
+        image = capture_image(args.device, args.exposure, args.color)
 
-    # save to all file types requested
-    for filename in args.filename:
-        logging.info('Saving to file %s', filename)
-        ext = os.path.splitext(filename)[1].lower()
-        if ext == '.raw':
-            save_raw(image, filename)
-        elif ext in ('.fit', '.fits'):
-            save_fits(image, filename)
-        else:
-            save_other(image, filename)
+        # save to all file types requested
+        for filename in args.filename:
+            logging.info('Saving to file %s', filename)
+            ext = os.path.splitext(filename)[1].lower()
+            if ext == '.raw':
+                image.save_raw(filename)
+            elif ext in ('.fit', '.fits'):
+                image.save_fits(filename)
+            else:
+                image.save_other(filename)
+
+    except Exception, ex:
+        logging.error('Exception: %s', str(ex))
+        for line in traceback.format_exc().splitlines():
+            logging.error(line)
+
+        sys.exit(1)
 
 if __name__ == '__main__':
     main()
