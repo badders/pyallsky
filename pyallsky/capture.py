@@ -46,14 +46,20 @@ class AllSkyImage(object):
         hdu = fits.PrimaryHDU(data, header=header)
         hdu.writeto(filename)
 
-    def save_other(self, filename, overlay=True):
+    def save_other(self, filename, postprocess=True, overlay=True):
         '''
         Write the image to a file in JPEG/PNG format
 
+        postprocess -- boost the image's brightness and contrast
         overlay -- add an overlay with timestamp and exposure information
         '''
         # copy the image so we don't change the internal data
         image = self.color_image.copy()
+
+        if postprocess:
+            image = maximize_dynamic_range(image)
+            image = scale_to_8bit(image)
+            image = clahe(image)
 
         if overlay:
             # small white font about 10 px tall
@@ -130,8 +136,56 @@ def capture_image(device, exposure_time, debayer=False):
         image.monochrome_image = cv2.cvtColor(data, cv2.COLOR_BAYER_BG2GRAY)
         image.color_image = cv2.cvtColor(data, cv2.COLOR_BAYER_BG2RGB)
 
-    # scale images to 8-bit
-    image.monochrome_image /= 256
-    image.color_image /= 256
+    return image
+
+def maximize_dynamic_range(image):
+    '''
+    Maximize the dynamic range of the image by taking the darkest pixel and
+    making it black, and finding the brightest pixel and making it white
+    '''
+    if type(image) is not numpy.ndarray:
+        raise TypeError('Input was not a numpy.ndarray')
+
+    # the maximum value of the data type that makes up this image
+    # 255 for 8-bit, 65535 for 16-bit, etc.
+    typeMax = numpy.iinfo(image.dtype).max
+
+    image = numpy.copy(image)
+
+    # make the darkest colored pixel in the image black
+    minValue = numpy.amin(image)
+    image -= minValue
+
+    # make the brightest colored pixel in the image white
+    maxValue = numpy.amax(image)
+    image *= (float(typeMax) / maxValue)
 
     return image
+
+def scale_to_8bit(image):
+    '''Scale a 16-bit image to an 8-bit image'''
+    if str(image.dtype) != 'uint16':
+        raise TypeError('Input did not have type numpy.uint16: was %s' % str(image.dtype))
+
+    return numpy.array(image / 256.0, dtype=numpy.uint8)
+
+def clahe(image, clipLimit=2.0, gridSize=4):
+    '''
+    Use the OpenCV Contrast Limited Adaptive Histogram Equalization algorithm
+    to improve the brightness and contrast of the image
+    '''
+    if type(image) is not numpy.ndarray:
+        raise TypeError('Input was not a numpy.ndarray')
+
+    if str(image.dtype) != 'uint8':
+        raise TypeError('Input did not have type numpy.uint8: was %s' % str(image.dtype))
+
+    clahe = cv2.createCLAHE(clipLimit=clipLimit, tileGridSize=(gridSize, gridSize))
+
+    # handle both color and monochrome images
+    if image.shape[-1] == 3:
+        planes = cv2.split(image)
+        planes = map(clahe.apply, planes)
+        return cv2.merge(planes)
+    else:
+        return clahe.apply(image)
