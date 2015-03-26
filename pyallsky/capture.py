@@ -169,7 +169,7 @@ def scale_to_8bit(image):
 
     return numpy.array(image / 256.0, dtype=numpy.uint8)
 
-def clahe(image, clipLimit=2.0, gridSize=4):
+def cvclahe(image, clipLimit=2.0, gridSize=4):
     '''
     Use the OpenCV Contrast Limited Adaptive Histogram Equalization algorithm
     to improve the brightness and contrast of the image
@@ -189,3 +189,34 @@ def clahe(image, clipLimit=2.0, gridSize=4):
         return cv2.merge(planes)
     else:
         return clahe.apply(image)
+
+def skclahe(image):
+    '''
+    SciKit-Image based CLAHE algorithm, used when OpenCV package is too old
+
+    Scales the image in a bizarre way as compared to OpenCV. We compensate for
+    the scaling by multiplying the image from floats in the range [0.0, 1.0]
+    back into uint8 values.
+    '''
+    import skimage.exposure
+    image = skimage.exposure.equalize_adapthist(image, ntiles_x=16, ntiles_y=16)
+    image *= 255.0
+    return image
+
+def clahe(image, clipLimit=2.0, gridSize=4):
+    ''' Wrapper around multiple possible CLAHE algorithms'''
+
+    try:
+        logging.info('Trying OpenCV CLAHE')
+        return cvclahe(image, clipLimit, gridSize)
+    except AttributeError:
+        logging.info('OpenCV does not have the createCLAHE function: please upgrade')
+
+    try:
+        logging.info('Trying SciKit-Image CLAHE')
+        return skclahe(image)
+    except ImportError:
+        logging.info('No SciKit-Image found: please install it for CLAHE support')
+
+    logging.info('No supported CLAHE package found, image is unchanged')
+    return image
