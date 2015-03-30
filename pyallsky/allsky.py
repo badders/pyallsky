@@ -98,7 +98,6 @@ def serial_rx(ser, nbytes, timeout=0.5):
     data = ''
 
     while True:
-
         # timeout has passed, break out of the loop
         tcurrent = time.time()
         tdiff = tcurrent - tstart
@@ -125,18 +124,26 @@ def serial_tx(ser, data, timeout=0.5):
     '''
     ser.write(data)
 
-def serial_rx_until(ser, terminator):
+def serial_rx_until(ser, terminator, timeout=5.0):
     '''
     Receive data from a serial port until a certain terminator character is received
 
     ser -- the serial.Serial() to receive from
     terminator -- the single character which terminates the receive operation
+    timeout -- the maximum amount of time to wait
 
     Returns all of the data read up to (but not including) the terminator
     '''
+    tstart = time.time()
     data = ''
 
     while True:
+        # timeout has passed, break out of the loop
+        tcurrent = time.time()
+        tdiff = tcurrent - tstart
+        if tdiff > timeout:
+            break
+
         c = ser.read(1)
         if c == terminator:
             break
@@ -374,9 +381,9 @@ class AllSkyCamera(object):
         '''Low level method to transmit some bytes to the camera'''
         return serial_tx(self.__ser, data, timeout)
 
-    def serial_rx_until(self, terminator):
+    def serial_rx_until(self, terminator, timeout=5.0):
         '''Low level method to receive some bytes from the camera until a terminating byte is received'''
-        return serial_rx_until(self.__ser, terminator)
+        return serial_rx_until(self.__ser, terminator, timeout)
 
     def firmware_version(self):
         '''
@@ -440,7 +447,7 @@ class AllSkyCamera(object):
         return -- the string of calibration data sent back from camera
         '''
         self.send_command(CALIBRATE_GUIDER)
-        return self.serial_rx_until(TERMINATOR)
+        return self.serial_rx_until(TERMINATOR, 240.0)
 
     def autonomous_guide(self):
         '''
@@ -448,7 +455,7 @@ class AllSkyCamera(object):
         return -- Data sent back from camera
         '''
         self.send_command(AUTO_GUIDE)
-        return self.serial_rx_until(TERMINATOR)
+        return self.serial_rx_until(TERMINATOR, 240.0)
 
     def take_image(self, exposure=1.0):
         '''
@@ -467,8 +474,11 @@ class AllSkyCamera(object):
         logging.debug('Exposure begin: command %s', hexify(com))
         self.send_command(com)
 
-        # wait until the exposure is finished
-        self.serial_rx_until(EXPOSURE_DONE)
+        # wait until the exposure is finished, with plenty of timing slack to
+        # handle hardware latency on very short exposures (measurements show
+        # that the camera has ~1 second of hardware latency)
+        timeout = exposure + 5.0
+        self.serial_rx_until(EXPOSURE_DONE, timeout)
         logging.debug('Exposure complete')
 
         return timestamp
