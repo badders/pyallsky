@@ -473,23 +473,27 @@ class AllSkyCamera(object):
 
         return timestamp
 
-    def __xfer_image_block(self, expected=4096, ignore_csum=False):
+    def __xfer_image_block(self, expected=4096, ignore_csum=False, tries=10):
         '''
         Get one 'block' of image data. At full frame the camera returns image
         data in chunks of 4096 pixels. For different imaging modes this value
         will change, but the caller can simply change the value of expected.
 
-        This routine will automatically retry if a communication error occurs.
+        This routine will automatically retry if a communication error occurs,
+        up to the maximum number of retries specified.
 
         expected -- Number of pixels to retrieve
-        ignore_csum -- always pass checksum without checking (for debug only)
+        ignore_csum -- Always pass checksum without checking (for debug only)
+        tries -- The maximum number of tries before aborting transfer
 
         return -- the raw pixel data from the camera as a Python array of unsigned bytes
         '''
-        csum_failed = 0
-        while True:
-            if csum_failed >= 1:
-                logging.debug('Get Image Block: retry, failure %d', csum_failed)
+        for i in xrange(tries):
+            logging.debug('Get Image Block: try %d', i)
+
+            # not the first try, transmit checksum error so the camera will try again
+            if i > 0:
+                self.serial_tx(CSUM_ERROR)
 
             # calculate number of bytes and expected transfer time
             nbytes = expected * PIXEL_SIZE
@@ -501,11 +505,9 @@ class AllSkyCamera(object):
             csum_byte = self.serial_rx(1)
             logging.debug('Get Image Block: finished reading data')
 
-            # not enough bytes, kill it and try again
+            # not enough bytes, therefore transfer failed
             if len(data) != nbytes:
                 logging.debug('Not enough data returned before timeout')
-                self.serial_tx(CSUM_ERROR)
-                csum_failed += 1
                 continue
 
             # calculate XOR-based checksum, convert data to ints, then xor
@@ -524,17 +526,17 @@ class AllSkyCamera(object):
 
             # enough bytes and csum valid, exit the loop
             if ignore_csum or csum == csum_byte:
-                logging.debug('Checksum OK')
+                logging.debug('Checksum OK, successfully received block')
                 self.serial_tx(CSUM_OK)
-                break
+                return data
 
             # enough bytes and csum invalid, try again
             logging.debug('Checksum ERROR')
-            self.serial_tx(CSUM_ERROR)
-            csum_failed += 1
 
-        logging.debug('Get Image Block: successfully received block')
-        return data
+        # too many retries passed, abort
+        logging.debug('Get Image Block: retries exhausted, abort transfer')
+        self.serial_tx(STOP_XFER)
+        raise AllSkyException('Too many errors during image sub-block transfer')
 
     def xfer_image(self, progress_callback=None):
         '''
