@@ -90,7 +90,7 @@ def show_progress(pct):
     '''Method to display image transfer progress depending on logging level'''
     logging.info('Transfer progress: %.2f%%', pct)
 
-def capture_image(device, exposure_time, debayer=False):
+def capture_image(device, exposure_time, debayer=False, rotate180=False):
     '''
     High level method to capture an image from the SBIG AllSky 340/340C camera
 
@@ -100,6 +100,7 @@ def capture_image(device, exposure_time, debayer=False):
     device -- the device node to use (for example, /dev/ttyUSB0)
     exposure_time -- the exposure time to use (in seconds)
     debayer -- use the de-Bayer function to interpret color CCD data
+    rotate180 -- rotate the image 180 degrees: some cameras are installed upside down
 
     Exceptions:
     serial.serialutil.SerialException -- exception raised by pyserial
@@ -135,6 +136,13 @@ def capture_image(device, exposure_time, debayer=False):
     if debayer:
         image.monochrome_image = cv2.cvtColor(data, cv2.COLOR_BAYER_BG2GRAY)
         image.color_image = cv2.cvtColor(data, cv2.COLOR_BAYER_BG2RGB)
+
+    # some cameras are installed upside down, so we can optionally rotate
+    # this must happen after the debayer, otherwise the colors get messed up
+    # due to changing the pixel ordering
+    if rotate180:
+        image.monochrome_image = numpy.rot90(numpy.rot90(image.monochrome_image))
+        image.color_image = numpy.rot90(numpy.rot90(image.color_image))
 
     return image
 
