@@ -179,7 +179,7 @@ def create_circle_mask(pixels, rad_frac=0.92):
 
     return (rsep2 <= pix_rad)
 
-def maximize_dynamic_range(pixels, mask=None, pct=[2.5, 50, 97.5]):
+def maximize_dynamic_range(pixels, mask=None, pct=[2.5, 97.5]):
     '''
     Use the percentile method to maximize dynamic range of the image.
 
@@ -187,7 +187,7 @@ def maximize_dynamic_range(pixels, mask=None, pct=[2.5, 50, 97.5]):
         pixels - a numpy.ndarray(dtype=numpy.uint16) representing the image
         mask   - a numpy.ndarray(dtype=bool) mask where True represents the
                  pixels that should be used when calculating the histogram
-        pct    - the lower, median, and upper percentiles to use
+        pct    - the lower and upper percentiles to use
 
     Returns:
         A copy of the input image which has been transformed to maximize the
@@ -207,7 +207,7 @@ def maximize_dynamic_range(pixels, mask=None, pct=[2.5, 50, 97.5]):
     image = pixels.astype(numpy.float32)
 
     # calculate the percentiles on the pixels we are interested in
-    lower, median, upper = numpy.percentile(image[mask], pct)
+    lower, upper = numpy.percentile(image[mask], pct)
 
     # make the darkest colored pixel in the usable area of the image black
     image -= lower
