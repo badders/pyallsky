@@ -112,9 +112,6 @@ def capture_image(device, exposure_time, debayer=False, rotate180=False):
     logging.info('Connecting to camera')
     cam = AllSkyCamera(device)
 
-    logging.info('Opening shutter')
-    cam.open_shutter()
-
     # create image storage
     image = AllSkyImage()
     image.exposure = exposure_time
