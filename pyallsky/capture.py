@@ -35,9 +35,10 @@ class AllSkyImage(object):
         '''Write the image to a file in FITS format'''
         # add information to FITS header
         header = fits.Header()
-        header['DATAMODE'] = '1X1 BIN'
-        header['EXPOSURE'] = '%f' % self.exposure
-        header['DATE-OBS'] = self.timestamp.isoformat()
+        header['DATAMODE'] = ('1X1 BIN', 'Data Mode')
+        header['EXPOSURE'] = ('%f' % self.exposure, '[s] Exposure length')
+        header['EXPTIME']  = ('%f' % self.exposure, '[s] Exposure length')
+        header['DATE-OBS'] = (self.timestamp.isoformat(), '[UTC] Date of observation')
 
         # FITS needs some rotation
         data = self.monochrome_image.copy()
