@@ -58,9 +58,9 @@ class AllSkyImage(object):
         image = self.color_image.copy()
 
         if postprocess:
-            image = maximize_dynamic_range(image)
+            mask = create_circle_mask(image)
+            image = maximize_dynamic_range(image, mask)
             image = scale_to_8bit(image)
-            image = clahe(image)
 
         if overlay:
             # small white font about 10 px tall
@@ -144,29 +144,84 @@ def capture_image(device, exposure_time, debayer=False, rotate180=False):
 
     return image
 
-def maximize_dynamic_range(image):
+def create_circle_mask(pixels, rad_frac=0.92):
     '''
-    Maximize the dynamic range of the image by taking the darkest pixel and
-    making it black, and finding the brightest pixel and making it white
+    Create the mask needed to retrieve pixels inside and outside of a circular
+    area over the center of the image. This is used to retrieve the pixels from
+    within the "area of interest" (the sky) in the center of the image,
+    excluding the borders.
+
+    Arguments:
+        pixels   - a numpy.ndarray(dtype=numpy.uint16) representing the image
+        rad_frac - the fraction of the image to use as the radius of the circle
+
+    Returns:
+        A numpy.ndarray(dtype=bool) with the same shape as the input, where a
+        True value represents a pixel inside the circle
     '''
-    if type(image) is not numpy.ndarray:
+    # Pixel coordinates
+    ny, nx = pixels.shape[0:2]
+    xx, yy = numpy.meshgrid(1 + numpy.arange(nx), 1 + numpy.arange(ny))
+
+    # Image center
+    xp_mid = 0.5 * (nx + 1)
+    yp_mid = 0.5 * (ny + 1)
+
+    # Pick a radius
+    x_rad = 0.5 * nx * rad_frac
+    y_rad = 0.5 * ny * rad_frac
+    pix_rad = max(x_rad, y_rad)
+
+    # Select inner/outer pixels
+    xsep2 = (xx - xp_mid)
+    ysep2 = (yy - yp_mid)
+    rsep2 = numpy.sqrt(xsep2 ** 2 + ysep2 ** 2)
+
+    return (rsep2 <= pix_rad)
+
+def maximize_dynamic_range(pixels, mask=None, pct=[2.5, 50, 97.5]):
+    '''
+    Use the percentile method to maximize dynamic range of the image.
+
+    Arguments:
+        pixels - a numpy.ndarray(dtype=numpy.uint16) representing the image
+        mask   - a numpy.ndarray(dtype=bool) mask where True represents the
+                 pixels that should be used when calculating the histogram
+        pct    - the lower, median, and upper percentiles to use
+
+    Returns:
+        A copy of the input image which has been transformed to maximize the
+        dynamic range
+    '''
+    if type(pixels) is not numpy.ndarray:
         raise TypeError('Input was not a numpy.ndarray')
 
-    # the maximum value of the data type that makes up this image
-    # 255 for 8-bit, 65535 for 16-bit, etc.
-    typeMax = numpy.iinfo(image.dtype).max
+    if str(pixels.dtype) != 'uint16':
+        raise TypeError('Input did not have type numpy.uint16: was %s' % str(pixels.dtype))
 
-    image = numpy.copy(image)
+    # if no mask was given, use all pixels
+    if mask is None:
+        mask = numpy.ones(pixels.shape, dtype=bool)
 
-    # make the darkest colored pixel in the image black
-    minValue = numpy.amin(image)
-    image -= minValue
+    # make a copy of the data (as float32)
+    image = pixels.astype(numpy.float32)
 
-    # make the brightest colored pixel in the image white
-    maxValue = numpy.amax(image)
-    image *= (float(typeMax) / maxValue)
+    # calculate the percentiles on the pixels we are interested in
+    lower, median, upper = numpy.percentile(image[mask], pct)
 
-    return image
+    # make the darkest colored pixel in the usable area of the image black
+    image -= lower
+
+    # make the brightest pixel in the usable area of the image white
+    image /= (upper - lower)
+
+    # clamp any pixel values to within the [0.0, 1.0] range
+    image[(image > 1.0)] = 1.0
+    image[(image < 0.0)] = 0.0
+
+    # scale back to the numpy.uint16 data type
+    image *= 65535.0
+    return image.astype(numpy.uint16)
 
 def scale_to_8bit(image):
     '''Scale a 16-bit image to an 8-bit image'''
@@ -174,55 +229,3 @@ def scale_to_8bit(image):
         raise TypeError('Input did not have type numpy.uint16: was %s' % str(image.dtype))
 
     return numpy.array(image / 256.0, dtype=numpy.uint8)
-
-def cvclahe(image, clipLimit=2.0, gridSize=4):
-    '''
-    Use the OpenCV Contrast Limited Adaptive Histogram Equalization algorithm
-    to improve the brightness and contrast of the image
-    '''
-    if type(image) is not numpy.ndarray:
-        raise TypeError('Input was not a numpy.ndarray')
-
-    if str(image.dtype) != 'uint8':
-        raise TypeError('Input did not have type numpy.uint8: was %s' % str(image.dtype))
-
-    clahe = cv2.createCLAHE(clipLimit=clipLimit, tileGridSize=(gridSize, gridSize))
-
-    # handle both color and monochrome images
-    if image.shape[-1] == 3:
-        planes = cv2.split(image)
-        planes = map(clahe.apply, planes)
-        return cv2.merge(planes)
-    else:
-        return clahe.apply(image)
-
-def skclahe(image):
-    '''
-    SciKit-Image based CLAHE algorithm, used when OpenCV package is too old
-
-    Scales the image in a bizarre way as compared to OpenCV. We compensate for
-    the scaling by multiplying the image from floats in the range [0.0, 1.0]
-    back into uint8 values.
-    '''
-    import skimage.exposure
-    image = skimage.exposure.equalize_adapthist(image, ntiles_x=16, ntiles_y=16)
-    image *= 255.0
-    return image
-
-def clahe(image, clipLimit=2.0, gridSize=4):
-    ''' Wrapper around multiple possible CLAHE algorithms'''
-
-    try:
-        logging.info('Trying OpenCV CLAHE')
-        return cvclahe(image, clipLimit, gridSize)
-    except AttributeError:
-        logging.info('OpenCV does not have the createCLAHE function: please upgrade')
-
-    try:
-        logging.info('Trying SciKit-Image CLAHE')
-        return skclahe(image)
-    except ImportError:
-        logging.info('No SciKit-Image found: please install it for CLAHE support')
-
-    logging.info('No supported CLAHE package found, image is unchanged')
-    return image
