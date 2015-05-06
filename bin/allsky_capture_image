@@ -34,6 +34,10 @@ def main():
 
     # check filename extension on each file
     for filename in args.filename:
+        if os.path.exists(filename):
+            logging.error('File already exists: %s', filename)
+            sys.exit(1)
+
         known_extensions = ('.raw', '.jpg', '.jpeg', '.fit', '.fits')
         ext = os.path.splitext(filename)[1].lower()
         if ext not in known_extensions:
