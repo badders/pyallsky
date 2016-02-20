@@ -60,7 +60,9 @@ class AllSkyImage(object):
         if postprocess:
             mask = create_circle_mask(image)
             image = maximize_dynamic_range(image, mask)
-            image = scale_to_8bit(image)
+
+        # scale to 8 bit
+        image = scale_to_8bit(image)
 
         if overlay:
             # small white font about 10 px tall
