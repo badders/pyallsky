@@ -5,6 +5,7 @@ Capture an image in RAW/JPG/FITS format from an SBIG AllSky 340/340C
 '''
 
 import array
+import datetime
 import logging
 import numpy
 
@@ -138,6 +139,32 @@ def capture_image(device, exposure_time):
 
     logging.info('Downloading image')
     image.raw_pixels = cam.xfer_image(progress_callback=show_progress)
+
+    # convert to numpy array and rotate correctly
+    image.raw_image = numpy.frombuffer(image.raw_pixels, dtype=numpy.uint16)
+    image.raw_image = image.raw_image.reshape((480, 640))
+
+    return image
+
+def load_raw(filename, exposure_time=30.0, timestamp=None):
+    '''
+    Load a RAW image into an AllSkyImage object
+
+    This is primarily meant to be used to debug the image postprocessing code
+    without requiring the camera hardware.
+    '''
+    # fake timestamp data if not specified
+    if not timestamp:
+        timestamp = datetime.datetime.utcnow()
+
+    data = array.array('B')
+    with open(filename, 'r') as f:
+        data = array.array('B', f.read())
+
+    image = AllSkyImage()
+    image.exposure = exposure_time
+    image.timestamp = timestamp
+    image.raw_pixels = data
 
     # convert to numpy array and rotate correctly
     image.raw_image = numpy.frombuffer(image.raw_pixels, dtype=numpy.uint16)

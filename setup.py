@@ -23,6 +23,7 @@ setup(
         'bin/allsky_check_communications',
         'bin/allsky_get_version',
         'bin/allsky_heater_control',
+        'bin/allsky_process_raw',
         'bin/allsky_set_baudrate',
         'bin/allsky_shutter_control',
     ],

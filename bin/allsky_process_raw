@@ -1,0 +1,80 @@
+#!/usr/bin/env python
+
+'''
+Process a previously saved image in RAW format
+'''
+
+import os
+import sys
+import logging
+import argparse
+import traceback
+
+from pyallsky import load_raw
+from pyallsky import setup_logging
+
+def main():
+    desc = '''Process a RAW format image into other formats'''
+    parser = argparse.ArgumentParser(description=desc)
+    parser.add_argument('-d', '--debayer', action='store_true', help='Run debayer algorithm for Color CCD')
+    parser.add_argument('-e', '--exposure', type=float, help='Exposure time in seconds', default=1.0)
+    parser.add_argument('-g', '--grayscale', action='store_true', help='Save JPEG images as grayscale')
+    parser.add_argument('-o', '--overlay', action='store_true', help='Save JPEG images with overlay')
+    parser.add_argument('-p', '--postprocess', action='store_true', help='Postprocess JPEG images')
+    parser.add_argument('-r', '--rotate180', action='store_true', help='Rotate image 180 degrees after capture')
+    parser.add_argument('-s', '--source', help='Source RAW file')
+    parser.add_argument('-v', '--verbose', action='count', help='Enable script debugging', default=0)
+    parser.add_argument('filename', help='Filename to save image', nargs='+')
+    args = parser.parse_args()
+
+    # logging levels
+    if args.verbose >= 2:
+        setup_logging(logging.DEBUG)
+    elif args.verbose >= 1:
+        setup_logging(logging.INFO)
+    else:
+        setup_logging(logging.WARN)
+
+    # check filename extension on each file
+    for filename in args.filename:
+        if os.path.exists(filename):
+            logging.error('File already exists: %s', filename)
+            sys.exit(1)
+
+        known_extensions = ('.raw', '.jpg', '.jpeg', '.fit', '.fits')
+        ext = os.path.splitext(filename)[1].lower()
+        if ext not in known_extensions:
+            logging.error('Unknown file format requested')
+            logging.error('Supported extensions: %s', ', '.join(known_extensions))
+            sys.exit(1)
+
+    try:
+        # read the image from the source RAW file
+        image = load_raw(args.source, args.exposure)
+
+        if args.debayer:
+            image.debayer()
+
+        if args.rotate180:
+            image.rotate180()
+
+        # save to all file types requested
+        for filename in args.filename:
+            logging.info('Saving to file %s', filename)
+            ext = os.path.splitext(filename)[1].lower()
+            if ext == '.raw':
+                image.save_raw(filename)
+            elif ext in ('.fit', '.fits'):
+                image.save_fits(filename)
+            else:
+                image.save_other(filename, monochrome=args.grayscale, postprocess=args.postprocess, overlay=args.overlay)
+
+    except Exception, ex:
+        logging.error('Exception: %s', str(ex))
+        for line in traceback.format_exc().splitlines():
+            logging.error(line)
+
+        sys.exit(1)
+
+if __name__ == '__main__':
+    main()
