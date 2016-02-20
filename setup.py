@@ -12,7 +12,7 @@ setup(
     license = 'LGPL',
     packages = ['pyallsky'],
     install_requires = [
-        'astropy',
+        'fitsio',
         'colour_demosaicing',
         'Pillow',
         'numpy',

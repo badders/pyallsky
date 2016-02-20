@@ -38,7 +38,7 @@ def main():
             logging.error('File already exists: %s', filename)
             sys.exit(1)
 
-        known_extensions = ('.raw', '.jpg', '.jpeg', '.fit', '.fits')
+        known_extensions = ('.raw', '.jpg', '.jpeg', '.fit', '.fits', '.fz')
         ext = os.path.splitext(filename)[1].lower()
         if ext not in known_extensions:
             logging.error('Unknown file format requested')
@@ -59,10 +59,12 @@ def main():
         for filename in args.filename:
             logging.info('Saving to file %s', filename)
             ext = os.path.splitext(filename)[1].lower()
-            if ext == '.raw':
+            if ext in ('.raw', ):
                 image.save_raw(filename)
             elif ext in ('.fit', '.fits'):
                 image.save_fits(filename)
+            elif ext in ('.fz', ):
+                image.save_fits(filename, compress=True)
             else:
                 image.save_other(filename)
 

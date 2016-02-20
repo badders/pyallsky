@@ -16,7 +16,7 @@ Python package requirements
 -------------------
 * [pyserial](http://pyserial.sourceforge.net/)
 * [NumPy](http://www.numpy.org/)
-* [astropy](https://astropy.readthedocs.org/en/stable/)
+* [fitsio](https://pypi.python.org/pypi/fitsio/)
 * [colour_demosaicing](https://pypi.python.org/pypi/colour-demosaicing)
 * [Pillow](http://python-pillow.org/)
 

@@ -9,7 +9,7 @@ import datetime
 import logging
 import numpy
 
-from astropy.io import fits
+import fitsio
 
 from PIL import Image
 from PIL import ImageDraw
@@ -46,8 +46,12 @@ class AllSkyImage(object):
         with open(filename, 'wb') as f:
             f.write(self.raw_pixels.tostring())
 
-    def save_fits(self, filename):
-        '''Write the image to a file in FITS format'''
+    def save_fits(self, filename, compress=False):
+        '''
+        Write the image to a file in FITS format
+
+        compress -- compress the FITS image with RICE compression (lossless)
+        '''
         # copy the image so we don't change the internal data
         image = self.raw_image.copy()
 
@@ -59,14 +63,31 @@ class AllSkyImage(object):
         image = numpy.flipud(image)
 
         # add information to FITS header
-        header = fits.Header()
-        header['DATAMODE'] = ('1X1 BIN', 'Data Mode')
-        header['EXPOSURE'] = ('%f' % self.exposure, '[s] Exposure length')
-        header['EXPTIME']  = ('%f' % self.exposure, '[s] Exposure length')
-        header['DATE-OBS'] = (self.timestamp.isoformat(), '[UTC] Date of observation')
+        header = [
+            {
+                'name': 'DATAMODE',
+                'value': '1X1 BIN',
+                'comment': 'Data Mode',
+            },
+            {
+                'name': 'EXPOSURE',
+                'value': '%f' % self.exposure,
+                'comment': '[s] Exposure length',
+            },
+            {
+                'name': 'EXPTIME',
+                'value': '%f' % self.exposure,
+                'comment': '[s] Exposure length',
+            },
+            {
+                'name': 'DATE-OBS',
+                'value': self.timestamp.isoformat(),
+                'comment': '[UTC] Date of observation',
+            },
+        ]
 
-        hdu = fits.PrimaryHDU(image, header=header)
-        hdu.writeto(filename)
+        compress = 'RICE' if compress else None
+        fitsio.write(filename, image, compress=compress, header=header)
 
     def save_other(self, filename, monochrome=False, postprocess=True, overlay=True):
         '''
