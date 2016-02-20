@@ -4,11 +4,18 @@
 Capture an image in RAW/JPG/FITS format from an SBIG AllSky 340/340C
 '''
 
-import cv2
 import array
 import logging
 import numpy
+
 from astropy.io import fits
+
+from PIL import Image
+from PIL import ImageDraw
+from PIL import ImageFont
+from PIL import ImageOps
+
+from colour_demosaicing import demosaicing_CFA_Bayer_Malvar2004
 
 from pyallsky import AllSkyCamera
 
@@ -22,17 +29,34 @@ class AllSkyImage(object):
     def __init__(self):
         self.timestamp = 'UNSET'
         self.exposure = 0.0
-        self.pixels = array.array('B')
-        self.monochrome_image = numpy.zeros(0)
-        self.color_image = numpy.zeros(0)
+        self.raw_pixels = array.array('B')
+        self.raw_image = numpy.zeros(0)
+
+    def debayer(self):
+        '''Demosaic (debayer) the image'''
+        self.raw_image = demosaicing_CFA_Bayer_Malvar2004(self.raw_image, 'BGGR')
+
+    def rotate180(self):
+        '''Rotate the image by 180 degrees'''
+        self.raw_image = numpy.rot90(numpy.rot90(self.raw_image))
 
     def save_raw(self, filename):
         '''Write the raw CCD output to a file without any manipulation'''
         with open(filename, 'wb') as f:
-            f.write(self.pixels.tostring())
+            f.write(self.raw_pixels.tostring())
 
     def save_fits(self, filename):
         '''Write the image to a file in FITS format'''
+        # copy the image so we don't change the internal data
+        image = self.raw_image.copy()
+
+        # debayered images need to be turned into grayscale for FITS
+        if image.shape[-1] == 3:
+            image = rgb2gray_uint16(image)
+
+        # FITS needs some rotation
+        image = numpy.flipud(image)
+
         # add information to FITS header
         header = fits.Header()
         header['DATAMODE'] = ('1X1 BIN', 'Data Mode')
@@ -40,23 +64,21 @@ class AllSkyImage(object):
         header['EXPTIME']  = ('%f' % self.exposure, '[s] Exposure length')
         header['DATE-OBS'] = (self.timestamp.isoformat(), '[UTC] Date of observation')
 
-        # FITS needs some rotation
-        data = self.monochrome_image.copy()
-        data = numpy.flipud(data)
-
-        hdu = fits.PrimaryHDU(data, header=header)
+        hdu = fits.PrimaryHDU(image, header=header)
         hdu.writeto(filename)
 
-    def save_other(self, filename, postprocess=True, overlay=True):
+    def save_other(self, filename, monochrome=False, postprocess=True, overlay=True):
         '''
         Write the image to a file in JPEG/PNG format
 
+        monochrome -- save the image in monochrome (grayscale)
         postprocess -- boost the image's brightness and contrast
         overlay -- add an overlay with timestamp and exposure information
         '''
         # copy the image so we don't change the internal data
-        image = self.color_image.copy()
+        image = self.raw_image.copy()
 
+        # improve brightness and contrast
         if postprocess:
             mask = create_circle_mask(image)
             image = maximize_dynamic_range(image, mask)
@@ -64,36 +86,31 @@ class AllSkyImage(object):
         # scale to 8 bit
         image = scale_to_8bit(image)
 
+        # convert to PIL Image
+        image = Image.fromarray(image)
+
+        # convert to monochrome
+        if monochrome:
+            image = ImageOps.grayscale(image)
+
         if overlay:
-            # small white font about 10 px tall
-            font = cv2.FONT_HERSHEY_PLAIN
-            scale = 1
-            color = (255, 255, 255)
-            position = [0, 0]
-
             # line 1: date
-            position[1] += 16
-            text = self.timestamp.strftime('%F')
-            cv2.putText(image, text, tuple(position), font, scale, color)
-
             # line 2: time
-            position[1] += 16
-            text = self.timestamp.strftime('%T')
-            cv2.putText(image, text, tuple(position), font, scale, color)
-
             # line 3: exposure
-            position[1] += 16
-            text = '%f s' % self.exposure
-            cv2.putText(image, text, tuple(position), font, scale, color)
+            label_text = self.timestamp.strftime('%F\n%T\n') + ('%f s' % self.exposure)
+
+            font = ImageFont.truetype('DejaVuSansMono.ttf', 16)
+            d = ImageDraw.Draw(image)
+            d.text((4, 4), label_text, font=font, fill='white')
 
         # write the image
-        cv2.imwrite(filename, image)
+        image.save(filename, quality=95, optimize=True, progressive=True)
 
 def show_progress(pct):
     '''Method to display image transfer progress depending on logging level'''
     logging.info('Transfer progress: %.2f%%', pct)
 
-def capture_image(device, exposure_time, debayer=False, rotate180=False):
+def capture_image(device, exposure_time):
     '''
     High level method to capture an image from the SBIG AllSky 340/340C camera
 
@@ -102,8 +119,6 @@ def capture_image(device, exposure_time, debayer=False, rotate180=False):
 
     device -- the device node to use (for example, /dev/ttyUSB0)
     exposure_time -- the exposure time to use (in seconds)
-    debayer -- use the de-Bayer function to interpret color CCD data
-    rotate180 -- rotate the image 180 degrees: some cameras are installed upside down
 
     Exceptions:
     serial.serialutil.SerialException -- exception raised by pyserial
@@ -122,27 +137,11 @@ def capture_image(device, exposure_time, debayer=False, rotate180=False):
     image.timestamp = cam.take_image(exposure=exposure_time)
 
     logging.info('Downloading image')
-    image.pixels = cam.xfer_image(progress_callback=show_progress)
+    image.raw_pixels = cam.xfer_image(progress_callback=show_progress)
 
     # convert to numpy array and rotate correctly
-    data = numpy.frombuffer(image.pixels, dtype=numpy.uint16)
-    data = data.reshape((480, 640))
-
-    # make copies of the CCD data
-    image.monochrome_image = numpy.copy(data)
-    image.color_image = numpy.copy(data)
-
-    # color CCDs need de-Bayer
-    if debayer:
-        image.monochrome_image = cv2.cvtColor(data, cv2.COLOR_BAYER_BG2GRAY)
-        image.color_image = cv2.cvtColor(data, cv2.COLOR_BAYER_BG2RGB)
-
-    # some cameras are installed upside down, so we can optionally rotate
-    # this must happen after the debayer, otherwise the colors get messed up
-    # due to changing the pixel ordering
-    if rotate180:
-        image.monochrome_image = numpy.rot90(numpy.rot90(image.monochrome_image))
-        image.color_image = numpy.rot90(numpy.rot90(image.color_image))
+    image.raw_image = numpy.frombuffer(image.raw_pixels, dtype=numpy.uint16)
+    image.raw_image = image.raw_image.reshape((480, 640))
 
     return image
 
@@ -231,3 +230,10 @@ def scale_to_8bit(image):
         raise TypeError('Input did not have type numpy.uint16: was %s' % str(image.dtype))
 
     return numpy.array(image / 256.0, dtype=numpy.uint8)
+
+def rgb2gray_uint16(image):
+    '''Flatten a 16-bit debayered image into a grayscale image'''
+    if str(image.dtype) != 'uint16':
+        raise TypeError('Input did not have type numpy.uint16: was %s' % str(image.dtype))
+
+    return numpy.dot(image[...,:3], [0.299, 0.587, 0.114])

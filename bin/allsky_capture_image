@@ -46,8 +46,14 @@ def main():
             sys.exit(1)
 
     try:
-        # image from camera ccd, in raw, color, and monochrome formats
-        image = capture_image(args.device, args.exposure, args.color, args.rotate180)
+        # capture a raw image from the camera, without any processing
+        image = capture_image(args.device, args.exposure)
+
+        if args.color:
+            image.debayer()
+
+        if args.rotate180:
+            image.rotate180()
 
         # save to all file types requested
         for filename in args.filename:

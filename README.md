@@ -17,9 +17,7 @@ Python package requirements
 * [pyserial](http://pyserial.sourceforge.net/)
 * [NumPy](http://www.numpy.org/)
 * [astropy](https://astropy.readthedocs.org/en/stable/)
-* [OpenCV 2 Python Bindings](http://opencv.org/)
+* [colour_demosaicing](https://pypi.python.org/pypi/colour-demosaicing)
+* [Pillow](http://python-pillow.org/)
 
-If you are running under the Anaconda Python Distribution, use "conda install opencv"
-to install the OpenCV 2 bindings. On CentOS 7, the "opencv-python" package has them.
-
-Everything else is avalable using pip/easy_install.
+Everything is avalable using pip/easy_install.

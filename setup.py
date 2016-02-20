@@ -13,7 +13,8 @@ setup(
     packages = ['pyallsky'],
     install_requires = [
         'astropy',
-        #'cv2',
+        'colour_demosaicing',
+        'Pillow',
         'numpy',
         'pyserial',
     ],
