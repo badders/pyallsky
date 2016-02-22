@@ -4,12 +4,13 @@
 Control for the SBIG AllSky 340/340C
 '''
 
-import serial
-import time
-import logging
-import datetime
-import struct
 import array
+import datetime
+import logging
+import struct
+import time
+
+import serial
 
 # Test Commands
 COM_TEST = 'E'
@@ -52,6 +53,17 @@ MAX_EXPOSURE = 0x63FFFF
 CALIBRATE_GUIDER = 'H'
 AUTO_GUIDE = 'I'
 TERMINATOR = chr(0x1A)
+
+# Binning Types
+BIN_SUBFRAME = chr(0xFF)
+BIN_2X2 = chr(0x02)
+BIN_1X1_CROPPED = chr(0x01)
+BIN_1X1_FULL = chr(0x00)
+
+# Exposure Types
+EXP_LIGHT_AUTO_DARK = chr(0x02)
+EXP_LIGHT_ONLY = chr(0x01)
+EXP_DARK_ONLY = chr(0x00)
 
 # Other Constants
 PIXEL_SIZE = 2
@@ -457,17 +469,22 @@ class AllSkyCamera(object):
         self.send_command(AUTO_GUIDE)
         return self.serial_rx_until(TERMINATOR, 240.0)
 
-    def take_image(self, exposure=1.0):
+    def take_image(self, exposure=1.0, dark=False):
         '''
         Run an exposure of the CCD.
         exposure -- exposure time in seconds
+        dark -- take a dark current exposure
         return -- the timestamp that the exposure was taken in ISO format
         '''
         # Camera exposure time works in 100us units, with a maximum value
         exptime = min(exposure / 100e-6, MAX_EXPOSURE)
 
         exp = struct.pack('I', exptime)[:3]
-        com = TAKE_IMAGE + exp[::-1] + chr(0x00) + chr(0x01)
+        com = TAKE_IMAGE + exp[::-1] + BIN_1X1_FULL + EXP_LIGHT_ONLY
+
+        # replace the command with dark, if requested
+        if dark:
+            com[-1] = EXP_DARK_ONLY
 
         timestamp = datetime.datetime.utcnow()
 

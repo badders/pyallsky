@@ -9,15 +9,15 @@ Works on Linux (including Raspberry Pi) and Mac OSX, untested on Windows but no 
 
 Requirements
 ------------
-* [OSX Usb to Serial driver](http://plugable.com/drivers/prolific/)
+* [OSX USB to Serial driver](http://plugable.com/drivers/prolific/)
 * [Python 2.7](http://python.org)
 
 Python package requirements
 -------------------
-* [pyserial](http://pyserial.sourceforge.net/)
-* [NumPy](http://www.numpy.org/)
-* [fitsio](https://pypi.python.org/pypi/fitsio/)
 * [colour_demosaicing](https://pypi.python.org/pypi/colour-demosaicing)
+* [fitsio](https://pypi.python.org/pypi/fitsio/)
+* [NumPy](http://www.numpy.org/)
 * [Pillow](http://python-pillow.org/)
+* [pyserial](http://pyserial.sourceforge.net/)
 
 Everything is avalable using pip/easy_install.

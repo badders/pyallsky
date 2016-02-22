@@ -9,7 +9,7 @@ import logging
 import argparse
 
 from pyallsky import AllSkyCamera
-from pyallsky import setup_logging
+from pyallsky.util import setup_logging
 
 def main():
     desc = '''Get the firmware version and serial number of an SBIG AllSky 340/340C Camera'''

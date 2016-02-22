@@ -6,12 +6,13 @@ Check communications between the host PC and an SBIG AllSky 340/340C
 
 import argparse
 import logging
-import serial
 import sys
 
-from pyallsky import autobaud
-from pyallsky import check_communications
-from pyallsky import setup_logging
+import serial
+
+from pyallsky.camera import autobaud
+from pyallsky.camera import check_communications
+from pyallsky.util import setup_logging
 
 def main():
     desc = '''Check the communications with an SBIG AllSky 340/340C Camera'''

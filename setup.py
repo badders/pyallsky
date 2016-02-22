@@ -4,7 +4,7 @@ from setuptools import setup
 
 setup(
     name = 'pyallsky',
-    version = '0.2',
+    version = '0.3',
     description = 'Python Control of SBIG AllSky 340/340C Camera',
     url = 'http://www.lcogt.net',
     author = 'Ira W. Snyder',
@@ -12,10 +12,10 @@ setup(
     license = 'LGPL',
     packages = ['pyallsky'],
     install_requires = [
-        'fitsio',
         'colour_demosaicing',
-        'Pillow',
+        'fitsio',
         'numpy',
+        'Pillow',
         'pyserial',
     ],
     scripts = [
@@ -23,7 +23,6 @@ setup(
         'bin/allsky_check_communications',
         'bin/allsky_get_version',
         'bin/allsky_heater_control',
-        'bin/allsky_process_raw',
         'bin/allsky_set_baudrate',
         'bin/allsky_shutter_control',
     ],
