@@ -1,3 +1,5 @@
 include COPYING
 include COPYRIGHT
 include README.md
+include requirements.txt
+include etc/allsky_scheduler.template.conf

@@ -1,0 +1,484 @@
+#!/usr/bin/env python
+
+'''
+A simplistic scheduler for SBIG AllSky 340/340C cameras which will change the
+image parameters depending on whether it is daytime or nighttime. It can use
+either one camera with different parameters, or instead switch between two
+different cameras. This can be used so that color images with short exposure
+times are taken during the day, and monochrome images with long exposure times
+are taken during the night.
+
+In addition, subtraction of dark current is supported when the camera has
+reached the state where it is taking images with nominal exposure length.
+'''
+
+import os
+import sys
+import time
+import logging
+import argparse
+import datetime
+import traceback
+import ConfigParser
+from collections import namedtuple
+
+import ephem
+import numpy
+from daemonize import Daemonize
+
+from pyallsky import AllSkyCamera
+from pyallsky import AllSkyDeviceConfiguration
+from pyallsky import AllSkyImage
+from pyallsky import AllSkyImageProcessor
+from pyallsky import capture_image_device
+from pyallsky import is_supported_file_type
+from pyallsky.util import setup_logging
+
+################################################################################
+# Sun Ephemeris Calculations
+################################################################################
+
+SunEphemeris = namedtuple('SunEphemeris', [
+    'prev_sunrise',
+    'next_sunrise',
+    'prev_sunset',
+    'next_sunset',
+    'utctime',
+    'state',
+])
+
+def ephem_get_user(latitude, longitude, elevation):
+    '''Create a pyephem user for the given latitude/longitude/elevation'''
+    user = ephem.Observer()
+    user.lat = str(latitude)
+    user.lon = str(longitude)
+    user.elevation = float(elevation)
+
+    return user
+
+def ephem_get_sun(user, utctime):
+    '''
+    Retrieve the sunrise/sunset times and day/night state as a SunEphemeris object
+
+    user -- a pyephem user for the correct latitude/longitude/elevation
+    utctime -- the UTC timestamp which will be used in the computation
+    '''
+    user.date = utctime
+    sun = ephem.Sun()
+
+    d = {}
+    d['prev_sunrise'] = user.previous_rising(sun).datetime()
+    d['next_sunrise'] = user.next_rising(sun).datetime()
+    d['prev_sunset'] = user.previous_setting(sun).datetime()
+    d['next_sunset'] = user.next_setting(sun).datetime()
+    d['utctime'] = utctime
+    d['state'] = 'day' if d['next_sunset'] < d['next_sunrise'] else 'night'
+
+    return SunEphemeris(**d)
+
+def compute_minutes(later_time, earlier_time):
+    '''Compute the number of minutes between two datetime objects'''
+    if earlier_time > later_time:
+        raise ValueError('earlier_time is after later_time')
+
+    delta = later_time - earlier_time
+    seconds = int(delta.total_seconds())
+    minutes = int(seconds / 60)
+
+    return minutes
+
+def ephem_calculate_exposure(sun_ephem, nominal_exposure):
+    '''
+    Calculate the compensated exposure time based on the time before/after
+    sunrise/sunset. When the sky is still bright/dark, the exposure time
+    needs to be compensated to get nice images.
+
+    sun_ephem -- calculated sun ephemeris for the current time
+    nominal_exposure -- the normal exposure time during full day/night (float, in seconds)
+    return -- compensated exposure time (float, in seconds)
+    '''
+    # nominal exposure time from configuration
+    exposure = nominal_exposure
+
+    if sun_ephem.state == 'day':
+        minutes_since_sunrise = compute_minutes(sun_ephem.utctime, sun_ephem.prev_sunrise)
+        minutes_until_sunset = compute_minutes(sun_ephem.next_sunset, sun_ephem.utctime)
+
+        # early morning (just after sunrise), the sky is still fairly dark
+        # so the exposure time needs to be increased
+        if minutes_since_sunrise <= 20:
+            xp = [           0,           12,       20, ]
+            fp = [exposure * 4, exposure * 2, exposure, ]
+            exposure = numpy.interp(minutes_since_sunrise, xp, fp)
+
+        # early evening (just before sunset), the sky is beginning to get dark
+        # so the exposure time needs to be increased to compensate
+        if minutes_until_sunset <= 20:
+            xp = [     -20,          -12,            0, ]
+            fp = [exposure, exposure * 2, exposure * 4, ]
+            exposure = numpy.interp(minutes_until_sunset * -1, xp, fp)
+
+    else:
+        minutes_since_sunset = compute_minutes(sun_ephem.utctime, sun_ephem.prev_sunset)
+        minutes_until_sunrise = compute_minutes(sun_ephem.next_sunrise, sun_ephem.utctime)
+
+        # early night (just after sunset), the sky is just beginning to get dark,
+        # so the exposure time needs to be shortened to compensate
+        if minutes_since_sunset <= 45:
+            xp = [              0,              10,             20,             35,       45, ]
+            fp = [exposure / 5000, exposure / 2000, exposure / 750, exposure / 250, exposure, ]
+            exposure = numpy.interp(minutes_since_sunset, xp, fp)
+
+        # early morning (just before sunrise), the sky is beginning to get brighter,
+        # so the exposure time needs to be shortened to compensate
+        if minutes_until_sunrise <= 45:
+            xp = [     -45,            -35,            -20,             -10,               0, ]
+            fp = [exposure, exposure / 250, exposure / 750, exposure / 2000, exposure / 5000, ]
+            exposure = numpy.interp(minutes_until_sunrise * -1, xp, fp)
+
+    # round exposure time to the nearest 100 microsecond boundary for the camera
+    exposure *= 1e6
+    exposure = numpy.around(exposure, -2)
+    exposure /= 1e6
+
+    # compensated exposure due to sun position
+    return exposure
+
+################################################################################
+# Configuration File
+################################################################################
+
+def get_device_configuration(config, section):
+    '''Read a device section from the configuration file into an AllSkyDeviceConfiguration object'''
+
+    d = {}
+    d['device'] = config.get(section, 'device')
+    d['exposure'] = config.getfloat(section, 'exposure')
+    d['dark'] = config.getboolean(section, 'dark')
+    d['debayer'] = config.getboolean(section, 'debayer')
+    d['grayscale'] = config.getboolean(section, 'grayscale')
+    d['postprocess'] = config.getboolean(section, 'postprocess')
+    d['rotate180'] = config.getboolean(section, 'rotate180')
+    d['overlay'] = config.getboolean(section, 'overlay')
+
+    return AllSkyDeviceConfiguration(**d)
+
+GeneralConfiguration = namedtuple('GeneralConfiguration', [
+    'siteid',
+    'latitude',
+    'longitude',
+    'elevation',
+    'interval',
+    'dark_interval',
+    'directory',
+    'extensions',
+    'day',
+    'night',
+])
+
+def get_configuration(filename):
+    '''Read the general section from the configuration file into a GeneralConfiguration object'''
+
+    # read configuration file
+    config = ConfigParser.ConfigParser()
+    with open(filename, 'r') as f:
+        config.readfp(f)
+
+    d = {}
+    d['siteid'] = config.get('general', 'siteid')
+    d['latitude'] = config.getfloat('general', 'latitude')
+    d['longitude'] = config.getfloat('general', 'longitude')
+    d['elevation'] = config.getfloat('general', 'elevation')
+    d['interval'] = config.getfloat('general', 'interval')
+    d['dark_interval'] = config.getfloat('general', 'dark_interval')
+    d['directory'] = config.get('general', 'directory')
+    d['extensions'] = config.get('general', 'extensions').split()
+
+    for ext in d['extensions']:
+        if not is_supported_file_type(ext):
+            logging.error('Unknown extension: %s', ext)
+            sys.exit(1)
+
+    d['day'] = get_device_configuration(config, 'day')
+    d['night'] = get_device_configuration(config, 'night')
+
+    return GeneralConfiguration(**d)
+
+################################################################################
+# Main Loop Methods
+################################################################################
+
+class AllSkyCameraInfo(object):
+    '''Object to hold information about a single AllSkyCamera'''
+    def __init__(self, device_config):
+        cam = AllSkyCamera(device_config.device)
+        self.baudrate = cam.get_baudrate()
+        self.serialno = cam.serial_number()
+        self.fwvers = cam.firmware_version()
+
+def make_empty_dark():
+    '''Create an empty dark current image, many years in the past'''
+    timestamp = datetime.datetime(1970, 1, 1)
+    exposure = 0.0
+    data = numpy.zeros(0)
+
+    return AllSkyImage(timestamp=timestamp, exposure=exposure, data=data)
+
+def sleep_until(boundary):
+    '''
+    Sleep until the boundary timestamp is reached
+
+    This function simply waits the number of seconds from the current
+    time until the boundary time. It will NOT correctly handle the case
+    where the clock is adjusted while it is running. For example, it
+    will not correctly handle a suspend/resume cycle.
+
+    boundary -- the UTC time to wait until
+    '''
+    logging.info('Wait until boundary: %s', boundary)
+
+    now = datetime.datetime.utcnow()
+    delta = boundary - now
+    seconds = delta.total_seconds()
+
+    if seconds <= 0:
+        logging.debug('No sleep needed, already past boundary!')
+
+
+    try:
+        logging.debug('Sleeping %d seconds', seconds)
+        time.sleep(seconds)
+    except KeyboardInterrupt:
+        logging.debug('KeyboardInterrupt while asleep, exit successfully')
+        sys.exit(0)
+
+def get_next_minute_boundary(utctime):
+    '''Round the given UTC timestamp to the next higher minute boundary'''
+    boundary = utctime + datetime.timedelta(minutes=1)
+    boundary = boundary.replace(second=0, microsecond=0)
+    return boundary
+
+def save_images(config, sun_ephem, processor):
+    '''Save all requested images'''
+
+    # generate symlinks with absolute path
+    symlink_base = 'AllSkyCurrentImage'
+    symlink_path = os.path.join(config.directory, symlink_base)
+    symlinks = [symlink_path + ext for ext in config.extensions]
+
+    # add the date to the output directory
+    utctime = processor.image.timestamp
+    directory = os.path.join(config.directory, utctime.strftime('%Y-%m-%d'))
+
+    # create file output directory if it does not exist
+    if not os.path.isdir(directory):
+        os.makedirs(directory)
+
+    # generate filenames with absolute path
+    filename_base = config.siteid + utctime.strftime('-%s-') + sun_ephem.state
+    filename_path = os.path.join(directory, filename_base)
+    filenames = [filename_path + ext for ext in config.extensions]
+
+    # save each file
+    for fn in filenames:
+        if os.path.exists(fn):
+            logging.error('File already exists: %s', fn)
+            continue
+
+        logging.info('Saving to file %s', fn)
+        processor.save(fn)
+
+    # Create symlinks
+    for source, link_name in zip(filenames, symlinks):
+        try:
+            os.remove(link_name)
+        except OSError:
+            pass
+
+        try:
+            os.symlink(source, link_name)
+        except OSError, ex:
+            logging.error('Symlink creation error: %s', str(ex))
+
+################################################################################
+# Main Loop
+################################################################################
+
+class MainLoopState(object):
+    '''Object to hold the main loop state between iterations'''
+    def __init__(self, config):
+        self.dark = make_empty_dark()
+        self.camera_info = dict()
+
+        # fetch static information about day camera
+        try:
+            self.camera_info['day'] = AllSkyCameraInfo(config.day)
+        except Exception, ex:
+            logging.error('Error communicating with day camera: %s', str(ex))
+            for line in traceback.format_exc().splitlines():
+                logging.error(line)
+
+            sys.exit(1)
+
+        # check baudrate
+        if self.camera_info['day'].baudrate < 115200:
+            logging.warning('Day camera baudrate less than 115200, expect slow image capture!')
+
+        # fetch static information about night camera
+        try:
+            self.camera_info['night'] = AllSkyCameraInfo(config.night)
+        except Exception, ex:
+            logging.error('Error communicating with night camera: %s', str(ex))
+            for line in traceback.format_exc().splitlines():
+                logging.error(line)
+
+            sys.exit(1)
+
+        # check baudrate
+        if self.camera_info['night'].baudrate < 115200:
+            logging.warning('Night camera baudrate less than 115200, expect slow image capture!')
+
+def main_loop_step(config, user, loopstate):
+    '''Run a single step of the main loop'''
+    # get current UTC time
+    utctime = datetime.datetime.utcnow()
+    logging.info('Start loop at UTC time: %s', utctime)
+
+    # get sun ephemeris
+    sun_ephem = ephem_get_sun(user, utctime)
+    logging.info('It is currently: %s', sun_ephem.state)
+
+    # fetch static camera information for the correct camera
+    camera_info = loopstate.camera_info[sun_ephem.state]
+
+    # fetch parameters from the configuration for the correct camera
+    device_config = getattr(config, sun_ephem.state)
+
+    # calculate the compensated exposure time based on the sun position
+    logging.info('Nominal exposure: %s', device_config.exposure)
+    exposure = ephem_calculate_exposure(sun_ephem, device_config.exposure)
+    logging.info('Compensated exposure: %s', exposure)
+
+    # capture the next image
+    image = capture_image_device(device_config.device, exposure)
+
+    # we don't have a dark current image yet
+    dark_image = None
+
+    # if dark subtraction is enabled, and we are at full exposure length,
+    # then we will do dark current subtraction
+    if device_config.dark and exposure == device_config.exposure:
+        logging.info('Dark Current Subtraction Enabled!')
+
+        # if the last dark was taken too long ago, we will take a new one
+        age = utctime - loopstate.dark.timestamp
+        if age > datetime.timedelta(seconds=config.dark_interval):
+            logging.info('Capturing Dark')
+            loopstate.dark = capture_image_device(device_config.device, exposure, dark=True)
+
+        # use the dark current image this time around the loop
+        dark_image = loopstate.dark
+
+    # create image processor
+    processor = AllSkyImageProcessor(image, device_config, dark_image)
+
+    # add extra FITS headers
+    processor.add_fits_header('ORIGIN',   'LCOGT', 'Organization responsible for the data')
+    processor.add_fits_header('SITEID',   config.siteid, 'ID code of the Observatory site')
+    processor.add_fits_header('LONGITUD', config.longitude, '[deg East] Telescope Longitude')
+    processor.add_fits_header('LATITUDE', config.latitude, '[deg North] Telescope Latitude')
+    processor.add_fits_header('HEIGHT',   config.elevation, '[m] Altitude of Telescope above sea level')
+    processor.add_fits_header('DAYNIGHT', sun_ephem.state.upper(), 'DAY or NIGHT')
+    processor.add_fits_header('SERIALNO', camera_info.serialno, 'Camera Serial Number')
+    processor.add_fits_header('FWVERS',   camera_info.fwvers, 'Camera Firmware Version')
+
+    # save images in requested formats
+    save_images(config, sun_ephem, processor)
+
+def main_loop(config):
+    '''The main loop of the program, runs forever'''
+    # setup ephemeris user
+    user = ephem_get_user(
+        latitude=config.latitude,
+        longitude=config.longitude,
+        elevation=config.elevation
+    )
+
+    # create main loop state object
+    loopstate = MainLoopState(config)
+
+    # wait for the next minute boundary before starting the main loop
+    boundary = get_next_minute_boundary(datetime.datetime.utcnow())
+    sleep_until(boundary)
+
+    # run main loop
+    while True:
+        try:
+            main_loop_step(config, user, loopstate)
+        except Exception, ex:
+            logging.error('Exception: %s', str(ex))
+            for line in traceback.format_exc().splitlines():
+                logging.error(line)
+
+        # calculate the next expected boundary time
+        boundary += datetime.timedelta(seconds=config.interval)
+
+        # if we are past the calculated boundary, move us up to the next
+        # minute boundary to give the images predictable timestamps
+        utctime = datetime.datetime.utcnow()
+        if boundary < utctime:
+            logging.debug('Already past boundary: %s', boundary)
+            boundary = get_next_minute_boundary(utctime)
+
+        # wait until the next loop start time
+        sleep_until(boundary)
+
+def main():
+    '''Main Entrypoint'''
+
+    desc = '''Simple scheduler for SBIG AllSky 340/340C cameras'''
+    parser = argparse.ArgumentParser(description=desc)
+    parser.add_argument('-c', '--configuration', help='Main configuration file')
+    parser.add_argument('-f', '--foreground', action='store_true', help='Stay in foreground')
+    parser.add_argument('-l', '--logfile', help='Path to log file', default='-')
+    parser.add_argument('-p', '--pidfile', help='Path to PID file (daemon mode only)', default='/tmp/allsky_scheduler.pid')
+    parser.add_argument('-v', '--verbose', action='count', help='Enable script debugging', default=0)
+    args = parser.parse_args()
+
+    # ensure the timezone is set to UTC to make calculations easier
+    os.environ['TZ'] = 'UTC'
+
+    # setup the log output stream
+    logstream = sys.stdout
+    if args.logfile != '-':
+        logstream = open(args.logfile, 'a')
+
+    # setup logging with the desired output level
+    if args.verbose >= 2:
+        setup_logging(level=logging.DEBUG, stream=logstream)
+    elif args.verbose >= 1:
+        setup_logging(level=logging.INFO, stream=logstream)
+    else:
+        setup_logging(level=logging.WARNING, stream=logstream)
+
+    # build configuration object
+    config = get_configuration(args.configuration)
+    logging.debug('Parsed configuration as: %s', config)
+
+    # build daemon object
+    daemon = Daemonize(
+        app='allsky_scheduler',
+        pid=args.pidfile,
+        action=lambda: main_loop(config),
+        keep_fds=[logstream.fileno(), ],
+        logger=logging.getLogger(),
+        foreground=args.foreground
+    )
+
+    # start the daemon
+    daemon.start()
+
+if __name__ == '__main__':
+    main()
+
+# vim: set ts=4 sts=4 sw=4 et:
