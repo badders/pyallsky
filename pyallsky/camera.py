@@ -479,12 +479,11 @@ class AllSkyCamera(object):
         # Camera exposure time works in 100us units, with a maximum value
         exptime = min(exposure / 100e-6, MAX_EXPOSURE)
 
-        exp = struct.pack('I', exptime)[:3]
-        com = TAKE_IMAGE + exp[::-1] + BIN_1X1_FULL + EXP_LIGHT_ONLY
+        # choose between light/dark exposure type
+        exptype = EXP_DARK_ONLY if dark else EXP_LIGHT_ONLY
 
-        # replace the command with dark, if requested
-        if dark:
-            com[-1] = EXP_DARK_ONLY
+        exp = struct.pack('I', exptime)[:3]
+        com = TAKE_IMAGE + exp[::-1] + BIN_1X1_FULL + exptype
 
         timestamp = datetime.datetime.utcnow()
 

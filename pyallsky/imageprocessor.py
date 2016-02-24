@@ -50,16 +50,15 @@ class AllSkyImageProcessor(object):
         self.add_fits_header('EXPTIME',  '%f' % image.exposure, '[s] Exposure length')
         self.add_fits_header('DATE-OBS', image.timestamp.isoformat(), '[UTC] Date of observation')
 
-        # start with the raw ccd data
-        data = image.data
+        # convert to numpy array and rotate correctly
+        data = numpy.frombuffer(image.data, dtype=numpy.uint16)
+        data = data.reshape((480, 640))
 
         # subtract the dark if present
         if dark:
-            data = data - dark.data
-
-        # convert to numpy array and rotate correctly
-        data = numpy.frombuffer(data, dtype=numpy.uint16)
-        data = data.reshape((480, 640))
+            darkdata = numpy.frombuffer(dark.data, dtype=numpy.uint16)
+            darkdata = darkdata.reshape((480, 640))
+            data = data - darkdata
 
         # debayer for color ccd
         if device_config.debayer:
