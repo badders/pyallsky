@@ -4,7 +4,7 @@ from setuptools import setup
 
 setup(
     name = 'pyallsky',
-    version = '0.4',
+    version = '0.5',
     description = 'Python Control of SBIG AllSky 340/340C Camera',
     url = 'http://www.lcogt.net',
     author = 'Ira W. Snyder',

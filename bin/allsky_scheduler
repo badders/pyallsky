@@ -451,6 +451,9 @@ def set_serialport_groups(config):
 
     os.setgroups(groups)
 
+    logging.info('Setting umask to: 0022')
+    os.umask(0o22)
+
 def main():
     '''Main Entrypoint'''
 
