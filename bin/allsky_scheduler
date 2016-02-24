@@ -397,6 +397,9 @@ def main_loop_step(config, user, loopstate):
 
 def main_loop(config):
     '''The main loop of the program, runs forever'''
+    # log privilege levels for debugging
+    logging.warning('Running with privileges: uid=%s gid=%s groups=%s', os.getuid(), os.getgid(), os.getgroups())
+
     # setup ephemeris user
     user = ephem_get_user(
         latitude=config.latitude,
@@ -433,6 +436,21 @@ def main_loop(config):
         # wait until the next loop start time
         sleep_until(boundary)
 
+def set_serialport_groups(config):
+    '''
+    Runs before dropping privileges to set our process to belong to the group
+    or groups that own the serial port devices.
+    '''
+    groups = [
+        os.stat(config.day.device).st_gid,
+        os.stat(config.night.device).st_gid,
+    ]
+
+    groups = list(set(groups))
+    logging.info('Setting group membership to: %s', groups)
+
+    os.setgroups(groups)
+
 def main():
     '''Main Entrypoint'''
 
@@ -443,6 +461,8 @@ def main():
     parser.add_argument('-l', '--logfile', help='Path to log file', default='-')
     parser.add_argument('-p', '--pidfile', help='Path to PID file (daemon mode only)', default='/tmp/allsky_scheduler.pid')
     parser.add_argument('-v', '--verbose', action='count', help='Enable script debugging', default=0)
+    parser.add_argument('-u', '--user', help='Drop privileges to user', default=None)
+    parser.add_argument('-g', '--group', help='Drop privileges to group', default=None)
     args = parser.parse_args()
 
     # ensure the timezone is set to UTC to make calculations easier
@@ -471,6 +491,9 @@ def main():
         pid=args.pidfile,
         action=lambda: main_loop(config),
         keep_fds=[logstream.fileno(), ],
+        privileged_action=lambda: set_serialport_groups(config),
+        user=args.user,
+        group=args.group,
         logger=logging.getLogger(),
         foreground=args.foreground
     )
