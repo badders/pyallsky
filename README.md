@@ -4,6 +4,8 @@ pyallsky
 A Python class for intefacing with the SBIG AllSky 340/340C camera.
 
 Created using the [SBIG Serial Protocol Specification](ftp://sbig.com/pub/devsw/SG4_AllSky-340_SerialSpec.pdf).
+A PDF copy of this documentation, as well as the camera manual, are included in
+case they disappear off of the Internet.
 
 Works on Linux (including Raspberry Pi) and Mac OSX, untested on Windows but no reason it shouldn't work.
 
