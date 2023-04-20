@@ -160,6 +160,7 @@ def get_device_configuration(config, section):
     d['postprocess'] = config.getboolean(section, 'postprocess')
     d['rotate180'] = config.getboolean(section, 'rotate180')
     d['overlay'] = config.getboolean(section, 'overlay')
+    d['heating'] = config.getbooean(section, 'heating')
 
     return AllSkyDeviceConfiguration(**d)
 
@@ -309,6 +310,7 @@ class MainLoopState(object):
     def __init__(self, config):
         self.dark = make_empty_dark()
         self.camera_info = dict()
+        self.heating = False
 
         # fetch static information about day camera
         try:
@@ -344,6 +346,7 @@ def main_loop_step(config, user, loopstate):
     utctime = datetime.datetime.utcnow()
     logging.info('Start loop at UTC time: %s', utctime)
 
+
     # get sun ephemeris
     sun_ephem = ephem_get_sun(user, utctime)
     logging.info('It is currently: %s', sun_ephem.state)
@@ -354,13 +357,20 @@ def main_loop_step(config, user, loopstate):
     # fetch parameters from the configuration for the correct camera
     device_config = getattr(config, sun_ephem.state)
 
+    # choose whether to heat or not depending on device_config
+    # and log any change in heating state
+    if loopstate.heating is not device_config.heating:
+        on_or_off = "on" if device_config.heating else "off"
+        logging.info('Turning heating {}'.format(on_or_off))
+        loopstate.heating = device_config.heating
+
     # calculate the compensated exposure time based on the sun position
     logging.info('Nominal exposure: %s', device_config.exposure)
     exposure = ephem_calculate_exposure(sun_ephem, device_config.exposure)
     logging.info('Compensated exposure: %s', exposure)
 
-    # capture the next image
-    image = capture_image_device(device_config.device, exposure)
+    # capture the next image / control the heater
+    image = capture_image_device(device_config.device, exposure, device_config.heating)
 
     # we don't have a dark current image yet
     dark_image = None
