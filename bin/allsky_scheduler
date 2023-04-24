@@ -216,6 +216,7 @@ class AllSkyCameraInfo(object):
         self.baudrate = cam.get_baudrate()
         self.serialno = cam.serial_number()
         self.fwvers = cam.firmware_version()
+        self.heating = False
 
 def make_empty_dark():
     '''Create an empty dark current image, many years in the past'''
@@ -310,7 +311,6 @@ class MainLoopState(object):
     def __init__(self, config):
         self.dark = make_empty_dark()
         self.camera_info = dict()
-        self.heating = False
 
         # fetch static information about day camera
         try:
@@ -359,10 +359,10 @@ def main_loop_step(config, user, loopstate):
 
     # choose whether to heat or not depending on device_config
     # and log any change in heating state
-    if loopstate.heating is not device_config.heating:
+    if camera_info.heating is not device_config.heating:
         on_or_off = "on" if device_config.heating else "off"
         logging.info('Turning heating {}'.format(on_or_off))
-        loopstate.heating = device_config.heating
+        camera_info.heating = device_config.heating
 
     # calculate the compensated exposure time based on the sun position
     logging.info('Nominal exposure: %s', device_config.exposure)
