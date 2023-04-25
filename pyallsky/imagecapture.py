@@ -23,7 +23,9 @@ def show_progress(pct):
     '''Method to display image transfer progress depending on logging level'''
     logging.info('Transfer progress: %.2f%%', pct)
 
-def capture_image_device(device, exposure, dark=False, heating=False):
+
+
+def capture_image_device(device, exposure, dark=False):
     '''
     Capture an image from an SBIG AllSky 340/340C camera
     and control the heater (on or off)
@@ -31,7 +33,6 @@ def capture_image_device(device, exposure, dark=False, heating=False):
     device -- the device node to use (for example, /dev/ttyUSB0)
     exposure -- the exposure time to use (in seconds)
     dark -- capture a dark current image
-    heating -- true for on, false for off
 
     Exceptions:
     serial.serialutil.SerialException -- exception raised by pyserial
@@ -41,11 +42,6 @@ def capture_image_device(device, exposure, dark=False, heating=False):
     '''
     logging.info('Connecting to camera')
     cam = AllSkyCamera(device)
-
-    if heating:
-        cam.activate_heater()
-    else:
-        cam.deactivate_heater()
 
     logging.info('Taking exposure')
     timestamp = cam.take_image(exposure=exposure, dark=dark)
