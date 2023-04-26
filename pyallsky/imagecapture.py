@@ -23,9 +23,12 @@ def show_progress(pct):
     '''Method to display image transfer progress depending on logging level'''
     logging.info('Transfer progress: %.2f%%', pct)
 
+
+
 def capture_image_device(device, exposure, dark=False):
     '''
     Capture an image from an SBIG AllSky 340/340C camera
+    and control the heater (on or off)
 
     device -- the device node to use (for example, /dev/ttyUSB0)
     exposure -- the exposure time to use (in seconds)

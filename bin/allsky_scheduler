@@ -160,6 +160,7 @@ def get_device_configuration(config, section):
     d['postprocess'] = config.getboolean(section, 'postprocess')
     d['rotate180'] = config.getboolean(section, 'rotate180')
     d['overlay'] = config.getboolean(section, 'overlay')
+    d['heating'] = config.getboolean(section, 'heating')
 
     return AllSkyDeviceConfiguration(**d)
 
@@ -215,6 +216,7 @@ class AllSkyCameraInfo(object):
         self.baudrate = cam.get_baudrate()
         self.serialno = cam.serial_number()
         self.fwvers = cam.firmware_version()
+        self.heating = False
 
 def make_empty_dark():
     '''Create an empty dark current image, many years in the past'''
@@ -309,6 +311,8 @@ class MainLoopState(object):
     def __init__(self, config):
         self.dark = make_empty_dark()
         self.camera_info = dict()
+        self.day_camera =  AllSkyCameraInfo(config.day)
+        self.night_camera =  AllSkyCameraInfo(config.night)
 
         # fetch static information about day camera
         try:
@@ -338,11 +342,23 @@ class MainLoopState(object):
         if self.camera_info['night'].baudrate < 115200:
             logging.warning('Night camera baudrate less than 115200, expect slow image capture!')
 
+    def heating_control(self, turn_on, day_or_night):
+        if day_or_night is 'day' and turn_on:
+            self.day_camera.activate_heater()
+            self.night_camera.deactivate_heater()
+        elif day_or_night is 'night' and turn_on:
+            self.day_camera.deactivate_heater()
+            self.night_camera.activate_heater()
+        else:
+            self.day_camera.deactivate_heater()
+            self.night_camera.deactivate_heater()
+
 def main_loop_step(config, user, loopstate):
     '''Run a single step of the main loop'''
     # get current UTC time
     utctime = datetime.datetime.utcnow()
     logging.info('Start loop at UTC time: %s', utctime)
+
 
     # get sun ephemeris
     sun_ephem = ephem_get_sun(user, utctime)
@@ -354,12 +370,20 @@ def main_loop_step(config, user, loopstate):
     # fetch parameters from the configuration for the correct camera
     device_config = getattr(config, sun_ephem.state)
 
+    # log any change in heating state
+    if camera_info.heating is not device_config.heating:
+        on_or_off = "on" if device_config.heating else "off"
+        logging.info('Turning {} camera heating {}'.format(sun_ephem.state, on_or_off))
+        camera_info.heating = device_config.heating
+
     # calculate the compensated exposure time based on the sun position
     logging.info('Nominal exposure: %s', device_config.exposure)
     exposure = ephem_calculate_exposure(sun_ephem, device_config.exposure)
     logging.info('Compensated exposure: %s', exposure)
 
-    # capture the next image
+    loopstate.heating_control(device_config.heating, sun_ephem.state)
+
+    # capture the next image / control the heater
     image = capture_image_device(device_config.device, exposure)
 
     # we don't have a dark current image yet
