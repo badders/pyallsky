@@ -27,6 +27,7 @@ AllSkyDeviceConfiguration = namedtuple('AllSkyDeviceConfiguration', [
     'postprocess',      # improve brightness and contrast
     'rotate180',        # rotate the image 180 degrees
     'overlay',          # add image overlay (date, time, exposure)
+    'heating',          # turn heating on or off
 ])
 
 class AllSkyImageProcessor(object):
