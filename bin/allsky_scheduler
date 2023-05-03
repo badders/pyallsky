@@ -212,10 +212,10 @@ def get_configuration(filename):
 class AllSkyCameraInfo(object):
     '''Object to hold information about a single AllSkyCamera'''
     def __init__(self, device_config):
-        cam = AllSkyCamera(device_config.device)
-        self.baudrate = cam.get_baudrate()
-        self.serialno = cam.serial_number()
-        self.fwvers = cam.firmware_version()
+        self.cam = AllSkyCamera(device_config.device)
+        self.baudrate = self.cam.get_baudrate()
+        self.serialno = self.cam.serial_number()
+        self.fwvers = self.cam.firmware_version()
         self.heating = False
 
 def make_empty_dark():
@@ -344,14 +344,14 @@ class MainLoopState(object):
 
     def heating_control(self, turn_on, day_or_night):
         if day_or_night is 'day' and turn_on:
-            self.day_camera.activate_heater()
-            self.night_camera.deactivate_heater()
+            self.day_camera.cam.activate_heater()
+            self.night_camera.cam.deactivate_heater()
         elif day_or_night is 'night' and turn_on:
-            self.day_camera.deactivate_heater()
-            self.night_camera.activate_heater()
+            self.day_camera.cam.deactivate_heater()
+            self.night_camera.cam.activate_heater()
         else:
-            self.day_camera.deactivate_heater()
-            self.night_camera.deactivate_heater()
+            self.day_camera.cam.deactivate_heater()
+            self.night_camera.cam.deactivate_heater()
 
 def main_loop_step(config, user, loopstate):
     '''Run a single step of the main loop'''
