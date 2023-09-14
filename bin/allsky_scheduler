@@ -55,6 +55,8 @@ def ephem_get_user(latitude, longitude, elevation):
     user.elevation = float(elevation)
     user.horizon = '-10.6'
 
+    return user
+
 def ephem_get_sun(user, utctime):
     '''
     Retrieve the sunrise/sunset times and day/night state as a SunEphemeris object
