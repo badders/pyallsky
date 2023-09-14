@@ -53,6 +53,9 @@ def ephem_get_user(latitude, longitude, elevation):
     user.lat = str(latitude)
     user.lon = str(longitude)
     user.elevation = float(elevation)
+    # Choose a sun elevation at which the sky is sufficiently dark
+    # that lack of stars means cloud. See the discussion here:
+    # https://lcogt.slack.com/archives/C02507A9VTR/p1694632682594739
     user.horizon = '-10.6'
 
     return user
