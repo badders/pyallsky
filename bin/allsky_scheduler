@@ -53,6 +53,10 @@ def ephem_get_user(latitude, longitude, elevation):
     user.lat = str(latitude)
     user.lon = str(longitude)
     user.elevation = float(elevation)
+    # Choose a sun elevation at which the sky is sufficiently dark
+    # that lack of stars means cloud. See the discussion here:
+    # https://lcogt.slack.com/archives/C02507A9VTR/p1694632682594739
+    user.horizon = '-10.6'
 
     return user
 
@@ -65,6 +69,7 @@ def ephem_get_sun(user, utctime):
     '''
     user.date = utctime
     sun = ephem.Sun()
+
 
     d = {}
     d['prev_sunrise'] = user.previous_rising(sun).datetime()
@@ -106,35 +111,17 @@ def ephem_calculate_exposure(sun_ephem, nominal_exposure):
 
         # early morning (just after sunrise), the sky is still fairly dark
         # so the exposure time needs to be increased
-        if minutes_since_sunrise <= 20:
-            xp = [           0,           12,       20, ]
-            fp = [exposure * 4, exposure * 2, exposure, ]
+        if minutes_since_sunrise <= 60:
+            xp = [           0,           30,       60, ]
+            fp = [exposure * 10, exposure * 5, exposure, ]
             exposure = numpy.interp(minutes_since_sunrise, xp, fp)
 
         # early evening (just before sunset), the sky is beginning to get dark
         # so the exposure time needs to be increased to compensate
-        if minutes_until_sunset <= 20:
-            xp = [     -20,          -12,            0, ]
-            fp = [exposure, exposure * 2, exposure * 4, ]
+        if minutes_until_sunset <= 60:
+            xp = [     -60,          -30,            0, ]
+            fp = [exposure, exposure * 5, exposure * 10, ]
             exposure = numpy.interp(minutes_until_sunset * -1, xp, fp)
-
-    else:
-        minutes_since_sunset = compute_minutes(sun_ephem.utctime, sun_ephem.prev_sunset)
-        minutes_until_sunrise = compute_minutes(sun_ephem.next_sunrise, sun_ephem.utctime)
-
-        # early night (just after sunset), the sky is just beginning to get dark,
-        # so the exposure time needs to be shortened to compensate
-        if minutes_since_sunset <= 45:
-            xp = [              0,              10,             20,             35,       45, ]
-            fp = [exposure / 5000, exposure / 2000, exposure / 750, exposure / 250, exposure, ]
-            exposure = numpy.interp(minutes_since_sunset, xp, fp)
-
-        # early morning (just before sunrise), the sky is beginning to get brighter,
-        # so the exposure time needs to be shortened to compensate
-        if minutes_until_sunrise <= 45:
-            xp = [     -45,            -35,            -20,             -10,               0, ]
-            fp = [exposure, exposure / 250, exposure / 750, exposure / 2000, exposure / 5000, ]
-            exposure = numpy.interp(minutes_until_sunrise * -1, xp, fp)
 
     # round exposure time to the nearest 100 microsecond boundary for the camera
     exposure *= 1e6
