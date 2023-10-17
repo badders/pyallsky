@@ -146,8 +146,8 @@ class AllSkyImageProcessor(object):
 
         # add overlay
         if self.config.overlay:
-            # three lines: date, time, exposure
-            label_text = self.image.timestamp.strftime('%F\n%T\n') + ('%f s' % self.image.exposure)
+            # four lines: upper case site, date, time, exposure
+            label_text = ('%s\n' % self.config.siteid).upper() + self.image.timestamp.strftime('%F\n%T\n') + ('%f s' % self.image.exposure)
 
             font = ImageFont.truetype('DejaVuSansMono.ttf', 16)
             d = ImageDraw.Draw(image)
