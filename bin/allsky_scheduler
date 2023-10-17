@@ -391,7 +391,7 @@ def main_loop_step(config, user, loopstate):
         dark_image = loopstate.dark
 
     # create image processor
-    processor = AllSkyImageProcessor(image, device_config, dark_image)
+    processor = AllSkyImageProcessor(config.siteid, image, device_config, dark_image)
 
     # add extra FITS headers
     processor.add_fits_header('ORIGIN',   'LCOGT', 'Organization responsible for the data')

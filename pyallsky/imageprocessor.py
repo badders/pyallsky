@@ -33,7 +33,7 @@ AllSkyDeviceConfiguration = namedtuple('AllSkyDeviceConfiguration', [
 class AllSkyImageProcessor(object):
     '''Image processing for SBIG AllSky 340/340C camera'''
 
-    def __init__(self, image, device_config, dark=None):
+    def __init__(self, siteid, image, device_config, dark=None):
         '''
         Create an AllSkyImageProcessor
 
@@ -41,6 +41,7 @@ class AllSkyImageProcessor(object):
         device_config -- an instance of AllSkyDeviceConfiguration
         dark -- an optional instance of AllSkyImage containing dark current only
         '''
+        self.siteid = siteid
         self.image = image
         self.config = device_config
         self.fits_headers = []
@@ -147,7 +148,7 @@ class AllSkyImageProcessor(object):
         # add overlay
         if self.config.overlay:
             # four lines: upper case site, date, time, exposure
-            label_text = ('%s\n' % self.config.siteid).upper() + self.image.timestamp.strftime('%F\n%T\n') + ('%f s' % self.image.exposure)
+            label_text = ('%s\n' % self.siteid).upper() + self.image.timestamp.strftime('%F\n%T\n') + ('%f s' % self.image.exposure)
 
             font = ImageFont.truetype('DejaVuSansMono.ttf', 16)
             d = ImageDraw.Draw(image)
